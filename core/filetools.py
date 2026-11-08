@@ -1,127 +1,244 @@
 from __future__ import annotations
-import difflib, hashlib, os, shutil, uuid
+
+import difflib
+import hashlib
+import os
+import uuid
 from pathlib import Path
-from security import resolve_inside, is_sensitive, TEXT_EXTENSIONS
-from storage import DATA_DIR, audit
+
+from .security import IGNORED_DIRS, is_sensitive, is_text_path, resolve_inside
+from .storage import DATA_DIR, audit
 
 MAX_READ_BYTES = 1_000_000
 MAX_WRITE_BYTES = 2_000_000
+MAX_DIFF_SOURCE_BYTES = 2_000_000
 BACKUP_DIR = DATA_DIR / "backups"
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
-def list_files(root: str, limit=500):
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _audit_best_effort(event: str, detail: str) -> str:
+    try:
+        audit(event, detail)
+    except Exception:
+        # The file operation has already completed; do not leave its proposal
+        # pending and risk the user repeating a successful operation.
+        return " تعذر تسجيل العملية في سجل النشاط."
+    return ""
+
+
+def list_files(root: str, limit: int = 500) -> list[str]:
+    if limit <= 0:
+        return []
     base = Path(root).resolve(strict=True)
-    result = []
+    result: list[str] = []
     for current, dirs, names in os.walk(base, followlinks=False):
-        dirs[:] = [d for d in dirs if d not in {".git","node_modules","__pycache__",".venv","venv","dist","build"}]
+        dirs[:] = [directory for directory in dirs if directory not in IGNORED_DIRS]
         for name in names:
-            p = Path(current) / name
+            path = Path(current) / name
             try:
-                rel = p.relative_to(base)
-                if is_sensitive(rel) or p.is_symlink():
+                relative = path.relative_to(base)
+                if path.is_symlink() or is_sensitive(relative):
                     continue
-                if p.suffix.lower() in TEXT_EXTENSIONS:
-                    result.append(str(rel))
+                if is_text_path(relative):
+                    result.append(str(relative))
                     if len(result) >= limit:
                         return result
-            except Exception:
+            except (OSError, ValueError):
                 continue
     return result
 
-def read_file(root: str, relative: str):
-    p = resolve_inside(root, relative, allow_missing=False)
-    if not p.is_file() or p.stat().st_size > MAX_READ_BYTES:
-        raise ValueError("الملف غير موجود أو أكبر من حد القراءة (1MB).")
-    raw = p.read_bytes()
+
+def read_file(root: str, relative: str) -> str:
+    path = resolve_inside(root, relative, allow_missing=False)
+    if not is_text_path(relative):
+        raise ValueError("امتداد الملف غير مدعوم للقراءة النصية.")
+    if not path.is_file():
+        raise ValueError("المسار ليس ملفًا عاديًا.")
+
+    # Read one byte over the limit so a file that grows after stat cannot cause
+    # an unbounded allocation.
+    with path.open("rb") as file:
+        raw = file.read(MAX_READ_BYTES + 1)
+    if len(raw) > MAX_READ_BYTES:
+        raise ValueError("الملف أكبر من حد القراءة (1MB).")
     if b"\x00" in raw[:4096]:
         raise ValueError("يبدو أن الملف ثنائي وليس ملفًا نصيًا.")
     return raw.decode("utf-8", errors="replace")
 
-def make_proposal(root: str, operation: str, source: str, content=None, destination=None):
+
+def make_proposal(
+    root: str, operation: str, source: str, content=None, destination=None
+):
     if operation not in {"write", "move", "rename"}:
         raise ValueError("نوع العملية غير مدعوم.")
-    # Bind proposal to the exact resolved root at creation time.
-    root_str = str(Path(root).resolve())
-    src = resolve_inside(root, source)
+
+    root_path = Path(root).expanduser().resolve(strict=True)
+    root_str = str(root_path)
+    src = resolve_inside(root_path, source)
+
     if operation == "write":
-        if content is None or len(content.encode("utf-8")) > MAX_WRITE_BYTES:
-            raise ValueError("المحتوى فارغ أو أكبر من 2MB.")
-        old = src.read_bytes() if src.exists() and src.is_file() else None
-        if src.exists() and not src.is_file():
-            raise ValueError("المسار الحالي ليس ملفًا عاديًا.")
+        if not is_text_path(source):
+            raise ValueError("الكتابة مسموحة فقط للامتدادات النصية المدعومة.")
+        if content is None or not isinstance(content, str):
+            raise ValueError("المحتوى لازم يكون نصًا.")
+        if len(content.encode("utf-8")) > MAX_WRITE_BYTES:
+            raise ValueError("المحتوى أكبر من الحد المسموح (2MB).")
+
+        old = None
+        if src.exists():
+            if not src.is_file():
+                raise ValueError("المسار الحالي ليس ملفًا عاديًا.")
+            if src.stat().st_size > MAX_DIFF_SOURCE_BYTES:
+                raise ValueError("الملف الحالي أكبر من الحد المسموح لمراجعته (2MB).")
+            old = src.read_bytes()
+            if len(old) > MAX_DIFF_SOURCE_BYTES:
+                raise ValueError("الملف الحالي أكبر من الحد المسموح لمراجعته (2MB).")
+            if b"\x00" in old[:4096]:
+                raise ValueError("لن يتم استبدال ملف يبدو ثنائيًا.")
+
         return {
-            "id": str(uuid.uuid4()), "operation": operation, "source": source,
+            "id": str(uuid.uuid4()),
+            "operation": operation,
+            "source": source,
             "root": root_str,
-            "content": content, "source_hash": sha256_bytes(old) if old is not None else None,
-            "destination": None
+            "content": content,
+            "source_hash": sha256_bytes(old) if old is not None else None,
+            "destination": None,
         }
+
     if not destination:
         raise ValueError("حدد مسار الوجهة.")
-    dst = resolve_inside(root, destination)
+    dst = resolve_inside(root_path, destination)
     if not src.exists() or not src.is_file():
         raise ValueError("المصدر يجب أن يكون ملفًا موجودًا.")
     if dst.exists():
         raise FileExistsError("الوجهة موجودة بالفعل؛ لن يتم استبدالها.")
+
     return {
-        "id": str(uuid.uuid4()), "operation": operation, "source": source,
+        "id": str(uuid.uuid4()),
+        "operation": operation,
+        "source": source,
         "root": root_str,
-        "content": None, "source_hash": sha256_bytes(src.read_bytes()), "destination": destination
+        "content": None,
+        "source_hash": sha256_file(src),
+        "destination": destination,
     }
 
-def proposal_diff(root, proposal):
+
+def proposal_diff(root: str, proposal: dict) -> str:
     base_root = proposal.get("root") or root
     if proposal["operation"] != "write":
         return f"العملية: {proposal['operation']}\nمن: {proposal['source']}\nإلى: {proposal['destination']}"
-    p = resolve_inside(base_root, proposal["source"])
-    new = proposal["content"].splitlines()
-    if p.exists():
-        old = p.read_text(encoding="utf-8", errors="replace").splitlines()
-        diff = difflib.unified_diff(old, new, fromfile="قبل", tofile="بعد", lineterm="")
-        return "\n".join(diff)[:20000] or "لا يوجد اختلاف."
-    return "ملف جديد:\n" + proposal["content"][:10000]
 
-def approve_proposal(root: str, proposal: dict):
-    # Reject approval against a different root than the one the proposal was created for.
+    path = resolve_inside(base_root, proposal["source"])
+    new_lines = proposal["content"].splitlines()
+    if path.exists():
+        if path.stat().st_size > MAX_DIFF_SOURCE_BYTES:
+            raise ValueError("الملف الحالي أكبر من الحد المسموح لمراجعته (2MB).")
+        with path.open("rb") as file:
+            old_bytes = file.read(MAX_DIFF_SOURCE_BYTES + 1)
+        if len(old_bytes) > MAX_DIFF_SOURCE_BYTES:
+            raise ValueError("الملف الحالي أكبر من الحد المسموح لمراجعته (2MB).")
+        old_lines = old_bytes.decode("utf-8", errors="replace").splitlines()
+        diff = difflib.unified_diff(
+            old_lines, new_lines, fromfile="قبل", tofile="بعد", lineterm=""
+        )
+        return "\n".join(diff) or "لا يوجد اختلاف."
+    return "ملف جديد:\n" + proposal["content"]
+
+
+def approve_proposal(root: str, proposal: dict) -> str:
     proposal_root = proposal.get("root")
-    if proposal_root and str(Path(root).resolve()) != proposal_root:
-        raise RuntimeError("المجلد المصرح به تغيّر بعد إنشاء المقترح. أعد إنشاء المقترح تحت المجلد الصحيح.")
+    resolved_root = str(Path(root).expanduser().resolve(strict=True))
+    if proposal_root and resolved_root != proposal_root:
+        raise RuntimeError(
+            "المجلد المصرح به تغيّر بعد إنشاء المقترح. أعد إنشاء المقترح تحت المجلد الصحيح."
+        )
 
-    src = resolve_inside(root, proposal["source"])
-    if proposal["operation"] == "write":
-        current = src.read_bytes() if src.exists() and src.is_file() else None
+    try:
+        proposal_id = str(uuid.UUID(str(proposal["id"])))
+    except (KeyError, ValueError, TypeError, AttributeError) as exc:
+        raise ValueError("معرّف المقترح غير صالح.") from exc
+
+    operation = proposal.get("operation")
+    if operation not in {"write", "move", "rename"}:
+        raise ValueError("نوع العملية غير مدعوم.")
+
+    src = resolve_inside(resolved_root, proposal["source"])
+    if operation == "write":
+        current = None
+        if src.exists():
+            if not src.is_file():
+                raise ValueError("المسار ليس ملفًا عاديًا.")
+            if src.stat().st_size > MAX_DIFF_SOURCE_BYTES:
+                raise RuntimeError(
+                    "الملف تجاوز حد المراجعة بعد إنشاء المقترح؛ أعد إنشاءه."
+                )
+            current = src.read_bytes()
+            if len(current) > MAX_DIFF_SOURCE_BYTES:
+                raise RuntimeError(
+                    "الملف تجاوز حد المراجعة بعد إنشاء المقترح؛ أعد إنشاءه."
+                )
         current_hash = sha256_bytes(current) if current is not None else None
-        if current_hash != proposal["source_hash"]:
+        if current_hash != proposal.get("source_hash"):
             raise RuntimeError("الملف تغيّر بعد عرض المقترح. أعد إنشاء المقترح وراجعه.")
-        if src.exists() and not src.is_file():
-            raise ValueError("المسار ليس ملفًا عاديًا.")
-        if not src.parent.exists():
-            src.parent.mkdir(parents=True, exist_ok=True)
+        if not isinstance(proposal.get("content"), str):
+            raise ValueError("محتوى المقترح غير صالح.")
+        content_bytes = proposal["content"].encode("utf-8")
+        if len(content_bytes) > MAX_WRITE_BYTES:
+            raise ValueError("المحتوى أكبر من الحد المسموح (2MB).")
+
+        src.parent.mkdir(parents=True, exist_ok=True)
         if current is not None:
-            backup = BACKUP_DIR / f"{proposal['id']}.bak"
+            backup = BACKUP_DIR / f"{proposal_id}.bak"
             backup.write_bytes(current)
-        temp = src.with_name(src.name + f".{proposal['id']}.tmp")
+
+        temp = src.with_name(src.name + f".{proposal_id}.tmp")
         try:
-            with open(temp, "xb") as f:
-                f.write(proposal["content"].encode("utf-8"))
-                f.flush()
-                os.fsync(f.fileno())
+            with temp.open("xb") as file:
+                file.write(content_bytes)
+                file.flush()
+                os.fsync(file.fileno())
             os.replace(temp, src)
         finally:
             if temp.exists():
                 temp.unlink()
-        audit("write", f"{proposal['source']} [{proposal['id']}]")
-        return "تم حفظ الملف. " + (f"النسخة السابقة محفوظة في {BACKUP_DIR}" if current is not None else "تم إنشاء ملف جديد.")
 
-    dst = resolve_inside(root, proposal["destination"])
-    if not src.exists() or sha256_bytes(src.read_bytes()) != proposal["source_hash"]:
+        if sha256_file(src) != sha256_bytes(content_bytes):
+            raise RuntimeError(
+                "لم يتطابق الملف بعد الكتابة مع المقترح؛ راجع النسخة الاحتياطية قبل المتابعة."
+            )
+
+        audit_note = _audit_best_effort(
+            "write", f"{proposal['source']} [{proposal_id}]"
+        )
+        if current is not None:
+            return f"تم حفظ الملف. النسخة السابقة محفوظة في {BACKUP_DIR}.{audit_note}"
+        return f"تم إنشاء الملف الجديد.{audit_note}"
+
+    dst = resolve_inside(resolved_root, proposal["destination"])
+    if (
+        not src.exists()
+        or not src.is_file()
+        or sha256_file(src) != proposal.get("source_hash")
+    ):
         raise RuntimeError("المصدر تغيّر بعد عرض المقترح.")
     if dst.exists():
         raise FileExistsError("الوجهة ظهرت بعد عرض المقترح؛ تم إلغاء العملية.")
 
-    # Find nearest existing ancestor to compare devices BEFORE creating dirs.
+    # Find the nearest existing ancestor before creating destination directories.
     probe = dst.parent
     while not probe.exists():
         if probe == probe.parent:
@@ -129,8 +246,16 @@ def approve_proposal(root: str, proposal: dict):
         probe = probe.parent
     if src.stat().st_dev != probe.stat().st_dev:
         raise ValueError("النقل بين أقراص مختلفة غير مدعوم في الإصدار الأول.")
-    if not dst.parent.exists():
-        dst.parent.mkdir(parents=True, exist_ok=True)
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
     src.rename(dst)
-    audit(proposal["operation"], f"{proposal['source']} -> {proposal['destination']}")
-    return "تم نقل/إعادة تسمية الملف بنجاح."
+    if (
+        src.exists()
+        or not dst.is_file()
+        or sha256_file(dst) != proposal.get("source_hash")
+    ):
+        raise RuntimeError("تم النقل لكن تعذر التحقق من الملف في الوجهة.")
+    audit_note = _audit_best_effort(
+        operation, f"{proposal['source']} -> {proposal['destination']}"
+    )
+    return f"تم نقل/إعادة تسمية الملف بنجاح.{audit_note}"

@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 import argparse
-from storage import load_config
-from secrets_store import get_secret
-from providers import Provider, list_models
+
+from core.providers import Provider, list_models
+from core.secrets_store import get_secret
+from core.storage import load_config
+
 
 def main():
     parser = argparse.ArgumentParser(description="عرض موديلات مزود محفوظ في مساعدي")
@@ -17,9 +20,12 @@ def main():
     item = next((p for p in providers if p["name"] == name), None)
     if not item:
         raise SystemExit("المزود غير موجود.")
-    provider = Provider(name, item["base_url"], get_secret("provider_"+name) or "", item["model"])
+    provider = Provider(
+        name, item["base_url"], get_secret("provider_" + name) or "", item["model"]
+    )
     for model in list_models(provider):
         print(model)
+
 
 if __name__ == "__main__":
     main()
