@@ -1060,7 +1060,7 @@ elif tab == "الإعدادات":
     st.subheader("مزودو الذكاء الاصطناعي")
 
     with st.expander("➕ إضافة أو تحديث مزود", expanded=True):
-        name = st.text_input("اسم المزود", key="cfg_name")
+        name = st.text_input("اسم الحساب أو المزود", key="cfg_name")
         preset = st.selectbox(
             "النوع", list(PRESETS), key="cfg_preset", on_change=update_base_for_preset
         )
@@ -1069,8 +1069,8 @@ elif tab == "الإعدادات":
         )
         key = st.text_input("API Key", type="password", key="cfg_key")
         st.caption(
-            "OpenRouter متاح من قائمة الأنواع. لا تضع المفتاح في الكود أو المحادثة؛ "
-            "المفتاح المحفوظ يُدار محليًا عبر Keyring أو جلسة التطبيق."
+            "OpenRouter متاح من قائمة الأنواع. لإضافة أكثر من حساب للمزود نفسه، استخدم اسمًا مختلفًا لكل حساب. "
+            "لا تضع المفتاح في الكود أو المحادثة؛ كل مفتاح يُدار محليًا عبر Keyring أو جلسة التطبيق."
         )
 
         fingerprint = (name.strip(), base.strip(), key)
