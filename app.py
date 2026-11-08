@@ -474,8 +474,8 @@ def explain_chat_error(exc):
         )
     if error_type in {"NotFoundError", "BadRequestError"}:
         return t(
-            "رفض المزود الطلب. تحقّق من Model ID وإعدادات المزود.",
-            "The provider rejected the request. Check the model ID and provider settings.",
+            "رفض المزود الطلب. تحقّق من Model ID واختر موديل محادثة نصية يدعم Chat Completions، لا موديل صوت أو تضمين.",
+            "The provider rejected the request. Check the model ID and choose a text chat-completion model, not a speech or embedding model.",
         )
     return t(
         f"حدث خطأ: {exc}",
