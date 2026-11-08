@@ -70,6 +70,52 @@ def update_base_for_preset():
     st.session_state.pop("cfg_model_manual", None)
 
 
+def chat_model_options(provider_config, provider_name):
+    options = []
+    configured = provider_config.get("models", [])
+    if isinstance(configured, list):
+        options.extend(configured)
+    if st.session_state.get("model_inventory_provider") == provider_name:
+        inventory = st.session_state.get("model_inventory", [])
+        if isinstance(inventory, list):
+            options.extend(inventory)
+    options.append(provider_config.get("model", ""))
+    return list(
+        dict.fromkeys(
+            model.strip()
+            for model in options
+            if isinstance(model, str) and model.strip()
+        )
+    )
+
+
+def persist_chat_provider_selection():
+    selected_provider = st.session_state.get("chat_provider_selector")
+    if selected_provider and any(
+        item.get("name") == selected_provider for item in cfg.get("providers", [])
+    ):
+        cfg["active_provider"] = selected_provider
+        save_config(cfg)
+
+
+def persist_chat_model_selection(provider_name):
+    selected_model = st.session_state.get(f"chat_model_{provider_name}")
+    if not selected_model:
+        return
+    provider_config = next(
+        (
+            item
+            for item in cfg.get("providers", [])
+            if item.get("name") == provider_name
+        ),
+        None,
+    )
+    if provider_config is not None:
+        provider_config["model"] = selected_model
+        cfg["active_provider"] = provider_name
+        save_config(cfg)
+
+
 def authorized_proposal_root(proposal):
     """Return a proposal root only if it is still in the user's allowlist."""
     proposal_root = proposal.get("root")
@@ -448,31 +494,95 @@ if tab == "لوحة التحكم":
 
 # 2. المحادثة (Chat)
 elif tab == "المحادثة" or tab == "بيئة البرمجة":
-    with st.expander("⚙️ إعدادات الجلسة", expanded=False):
-        providers = cfg.get("providers", [])
-        if providers:
-            provider_names = [p["name"] for p in providers]
-            active = (
-                cfg.get("active_provider")
-                if cfg.get("active_provider") in provider_names
-                else provider_names[0]
-            )
-            selected = st.selectbox(
-                "المزود", provider_names, index=provider_names.index(active)
-            )
-            p_cfg = next(p for p in providers if p["name"] == selected)
-            model_override = st.text_input("Model ID", value=p_cfg["model"])
+    st.title("بيئة البرمجة" if st.session_state.mode == "code" else "المحادثة")
+    providers = cfg.get("providers", [])
+    if not providers:
+        st.warning("الرجاء إضافة مزود من صفحة الإعدادات أولاً.")
+        st.stop()
 
-            root = None
-            if st.session_state.mode == "code":
-                roots = cfg.get("granted_roots", [])
-                if roots:
-                    root = st.selectbox("مجلد العمل", roots)
-                else:
-                    st.info("أضف مجلد عمل من الإعدادات.")
+    provider_names = [item.get("name", "") for item in providers if item.get("name")]
+    active = cfg.get("active_provider")
+    if active not in provider_names:
+        active = provider_names[0]
+    if st.session_state.get("chat_provider_selector") not in provider_names:
+        st.session_state["chat_provider_selector"] = active
+
+    provider_col, model_col, refresh_col = st.columns([1, 1.5, 1])
+    with provider_col:
+        selected = st.selectbox(
+            "مزود الذكاء الاصطناعي",
+            provider_names,
+            key="chat_provider_selector",
+            on_change=persist_chat_provider_selection,
+        )
+    p_cfg = next(item for item in providers if item.get("name") == selected)
+    model_options = chat_model_options(p_cfg, selected)
+    model_key = f"chat_model_{selected}"
+    with model_col:
+        if model_options:
+            if st.session_state.get(model_key) not in model_options:
+                st.session_state[model_key] = p_cfg.get("model") or model_options[0]
+            model_override = st.selectbox(
+                "الموديل",
+                model_options,
+                key=model_key,
+                on_change=persist_chat_model_selection,
+                args=(selected,),
+            )
         else:
-            st.warning("الرجاء إضافة مزود من صفحة الإعدادات أولاً.")
-            st.stop()
+            model_override = st.text_input(
+                "Model ID",
+                value=p_cfg.get("model", ""),
+                key=model_key,
+                on_change=persist_chat_model_selection,
+                args=(selected,),
+            )
+
+    with refresh_col:
+        if st.button(
+            "تحديث الموديلات",
+            key=f"refresh_chat_models_{selected}",
+            help="يجلب قائمة الموديلات من المزود المحدد لتختار منها هنا.",
+        ):
+            try:
+                with st.spinner("جاري جلب الموديلات..."):
+                    discovered_models = list_models(
+                        Provider(
+                            selected,
+                            p_cfg.get("base_url", ""),
+                            get_secret("provider_" + selected) or "",
+                            p_cfg.get("model", ""),
+                        )
+                    )
+                saved_models = p_cfg.get("models", [])
+                if not isinstance(saved_models, list):
+                    saved_models = []
+                current_model = p_cfg.get("model", "")
+                if not isinstance(current_model, str):
+                    current_model = ""
+                p_cfg["models"] = sorted(
+                    set(discovered_models + saved_models + [current_model]) - {""}
+                )
+                st.session_state.model_inventory = p_cfg["models"]
+                st.session_state.model_inventory_provider = selected
+                save_config(cfg)
+                st.session_state.model_refresh_notice = (
+                    f"تم تحديث قائمة {selected}: {len(discovered_models)} موديلًا."
+                    if discovered_models
+                    else "لم يُرجع المزود قائمة موديلات جديدة؛ أبقينا الموديلات المحفوظة."
+                )
+                st.rerun()
+            except Exception as exc:
+                st.error(f"تعذر تحديث الموديلات: {exc}")
+
+    root = None
+    if st.session_state.mode == "code":
+        with st.expander("⚙️ إعدادات بيئة البرمجة", expanded=False):
+            roots = cfg.get("granted_roots", [])
+            if roots:
+                root = st.selectbox("مجلد العمل", roots)
+            else:
+                st.info("أضف مجلد عمل من الإعدادات.")
 
     personalization_enabled = cfg.get("personalization_enabled", True)
     system_prompt = compose_system_prompt(
@@ -481,8 +591,9 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
         "لا تدّع تنفيذ أي تغيير ملف قبل موافقة المستخدم.",
         cfg.get("assistant_instructions", "") if personalization_enabled else "",
     )
-    st.title("بيئة البرمجة" if st.session_state.mode == "code" else "المحادثة")
     st.caption(f"المزود: {selected} · الموديل: {model_override.strip()}")
+    if st.session_state.get("model_refresh_notice"):
+        st.success(st.session_state.pop("model_refresh_notice"))
     if personalization_enabled:
         st.caption(
             "التخصيص المحلي مفعّل؛ قد تُرسل المقاطع المسترجعة من ملاحظاتك للمزود المحدد مع سؤالك."
@@ -732,8 +843,15 @@ elif tab == "الموديلات":
                                 item.get("model", ""),
                             )
                         )
-                    st.session_state.model_inventory = model_list
+                    saved_models = item.get("models", [])
+                    if not isinstance(saved_models, list):
+                        saved_models = []
+                    item["models"] = sorted(
+                        set(model_list + saved_models + [item.get("model", "")]) - {""}
+                    )
+                    st.session_state.model_inventory = item["models"]
                     st.session_state.model_inventory_provider = chosen_name
+                    save_config(cfg)
                 except Exception as exc:
                     st.error(str(exc))
             if st.session_state.get("model_inventory_provider") == chosen_name:
@@ -950,6 +1068,10 @@ elif tab == "الإعدادات":
             "Base URL (HTTPS فقط)", value=PRESETS[preset], key="cfg_base"
         )
         key = st.text_input("API Key", type="password", key="cfg_key")
+        st.caption(
+            "OpenRouter متاح من قائمة الأنواع. لا تضع المفتاح في الكود أو المحادثة؛ "
+            "المفتاح المحفوظ يُدار محليًا عبر Keyring أو جلسة التطبيق."
+        )
 
         fingerprint = (name.strip(), base.strip(), key)
         if st.session_state.get("fetched_models_fingerprint") != fingerprint:
@@ -994,9 +1116,33 @@ elif tab == "الإعدادات":
                 st.error(str(exc))
             else:
                 providers = cfg.setdefault("providers", [])
-                cfg["providers"] = [p for p in providers if p.get("name") != clean_name]
+                existing_provider = next(
+                    (item for item in providers if item.get("name") == clean_name),
+                    {},
+                )
+                model_catalog = [
+                    model
+                    for model in st.session_state.get("fetched_models", [])
+                    if isinstance(model, str)
+                ]
+                existing_models = existing_provider.get("models", [])
+                if existing_provider.get("base_url") == clean_base and isinstance(
+                    existing_models, list
+                ):
+                    model_catalog.extend(
+                        model for model in existing_models if isinstance(model, str)
+                    )
+                model_catalog.append(clean_model)
+                cfg["providers"] = [
+                    item for item in providers if item.get("name") != clean_name
+                ]
                 cfg["providers"].append(
-                    {"name": clean_name, "base_url": clean_base, "model": clean_model}
+                    {
+                        "name": clean_name,
+                        "base_url": clean_base,
+                        "model": clean_model,
+                        "models": sorted(set(model_catalog)),
+                    }
                 )
                 if key:
                     set_secret("provider_" + clean_name, key)
