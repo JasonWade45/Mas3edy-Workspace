@@ -1,0 +1,6 @@
+streamlit>=1.40,<2
+openai>=1.50,<3
+requests>=2.32,<3
+beautifulsoup4>=4.12,<5
+platformdirs>=4.2,<5
+keyring>=25,<26
