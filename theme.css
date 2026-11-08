@@ -21,8 +21,10 @@ html, body, [class*="css"] {
   font-family: Inter, "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif !important;
 }
 
-html, body {
+[data-baseweb="popover"],
+[role="listbox"] {
   direction: var(--nova-direction, rtl);
+  text-align: start;
 }
 
 pre, code {
@@ -138,18 +140,31 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.8rem) !important; }
   line-height: 1.75;
 }
 
-.stButton > button,
+.main .stButton > button,
 .stDownloadButton > button,
 [data-testid="stFormSubmitButton"] > button {
-  border-radius: 12px;
   min-height: 42px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  color: var(--text) !important;
+  background: #1c293d !important;
   font-weight: 650;
-  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
-.stButton > button:hover,
+.main .stButton > button[kind="primary"],
+.stDownloadButton > button[kind="primary"],
+[data-testid="stFormSubmitButton"] > button[kind="primary"] {
+  border-color: rgba(186, 205, 225, 0.3) !important;
+  color: #fff !important;
+  background: #355574 !important;
+}
+
+.main .stButton > button:hover,
 .stDownloadButton > button:hover,
 [data-testid="stFormSubmitButton"] > button:hover {
+  border-color: rgba(148, 163, 184, 0.34);
+  background: #26374e !important;
   transform: translateY(-1px);
   box-shadow: 0 8px 20px rgba(3, 8, 20, 0.28);
 }
@@ -159,7 +174,19 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.8rem) !important; }
 [data-testid="stSelectbox"] [data-baseweb="select"] > div {
   border-radius: 12px !important;
   border-color: var(--line) !important;
+  color: var(--text) !important;
   background: rgba(17, 26, 43, 0.86) !important;
+}
+
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea {
+  color: var(--text) !important;
+}
+
+[data-testid="stTextInput"] input::placeholder,
+[data-testid="stTextArea"] textarea::placeholder {
+  color: var(--muted) !important;
+  opacity: 1;
 }
 
 [data-testid="stTextInput"] input:focus,
