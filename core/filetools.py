@@ -196,7 +196,8 @@ def approve_proposal(root: str, proposal: dict) -> str:
             raise RuntimeError("الملف تغيّر بعد عرض المقترح. أعد إنشاء المقترح وراجعه.")
         if not isinstance(proposal.get("content"), str):
             raise ValueError("محتوى المقترح غير صالح.")
-        if len(proposal["content"].encode("utf-8")) > MAX_WRITE_BYTES:
+        content_bytes = proposal["content"].encode("utf-8")
+        if len(content_bytes) > MAX_WRITE_BYTES:
             raise ValueError("المحتوى أكبر من الحد المسموح (2MB).")
 
         src.parent.mkdir(parents=True, exist_ok=True)
@@ -207,13 +208,18 @@ def approve_proposal(root: str, proposal: dict) -> str:
         temp = src.with_name(src.name + f".{proposal_id}.tmp")
         try:
             with temp.open("xb") as file:
-                file.write(proposal["content"].encode("utf-8"))
+                file.write(content_bytes)
                 file.flush()
                 os.fsync(file.fileno())
             os.replace(temp, src)
         finally:
             if temp.exists():
                 temp.unlink()
+
+        if sha256_file(src) != sha256_bytes(content_bytes):
+            raise RuntimeError(
+                "لم يتطابق الملف بعد الكتابة مع المقترح؛ راجع النسخة الاحتياطية قبل المتابعة."
+            )
 
         audit_note = _audit_best_effort(
             "write", f"{proposal['source']} [{proposal_id}]"
@@ -243,6 +249,12 @@ def approve_proposal(root: str, proposal: dict) -> str:
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     src.rename(dst)
+    if (
+        src.exists()
+        or not dst.is_file()
+        or sha256_file(dst) != proposal.get("source_hash")
+    ):
+        raise RuntimeError("تم النقل لكن تعذر التحقق من الملف في الوجهة.")
     audit_note = _audit_best_effort(
         operation, f"{proposal['source']} -> {proposal['destination']}"
     )

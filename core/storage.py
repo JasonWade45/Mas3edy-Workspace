@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from platformdirs import user_data_dir
@@ -42,9 +43,18 @@ def db():
                 kind TEXT NOT NULL CHECK(kind IN ('memory', 'knowledge', 'example')),
                 title TEXT NOT NULL,
                 content TEXT NOT NULL,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                expires_at TEXT
             )"""
         )
+        note_columns = {
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(assistant_notes)"
+            ).fetchall()
+        }
+        if "expires_at" not in note_columns:
+            connection.execute("ALTER TABLE assistant_notes ADD COLUMN expires_at TEXT")
         yield connection
         connection.commit()
     except Exception:
@@ -150,11 +160,19 @@ MAX_NOTE_TITLE_CHARS = 160
 MAX_NOTE_CONTENT_CHARS = 10_000
 
 
-def add_note(kind: str, title: str, content: str) -> int:
+def add_note(
+    kind: str, title: str, content: str, expires_in_days: int | None = None
+) -> int:
     if kind not in NOTE_KINDS:
         raise ValueError("نوع المعلومة غير مدعوم.")
     if not isinstance(title, str) or not isinstance(content, str):
         raise TypeError("العنوان والمحتوى لازم يكونوا نصًا.")
+    if expires_in_days is not None and (
+        not isinstance(expires_in_days, int)
+        or isinstance(expires_in_days, bool)
+        or not 1 <= expires_in_days <= 3650
+    ):
+        raise ValueError("مدة الاحتفاظ لازم تكون من يوم إلى 10 سنوات.")
     title = " ".join(title.split())[:MAX_NOTE_TITLE_CHARS]
     content = content.strip()
     if not title or not content:
@@ -162,30 +180,45 @@ def add_note(kind: str, title: str, content: str) -> int:
     if len(content) > MAX_NOTE_CONTENT_CHARS:
         raise ValueError("المحتوى أطول من الحد المسموح (10,000 حرف).")
 
+    expires_at = None
+    if expires_in_days is not None:
+        expires_at = (
+            datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+        ).strftime("%Y-%m-%d %H:%M:%S")
+
     with db() as connection:
         existing = connection.execute(
-            "SELECT id FROM assistant_notes WHERE kind=? AND title=? AND content=? LIMIT 1",
-            (kind, title, content),
+            """SELECT id FROM assistant_notes
+            WHERE kind=? AND title=? AND content=? AND expires_at IS ? LIMIT 1""",
+            (kind, title, content, expires_at),
         ).fetchone()
         if existing:
             return int(existing["id"])
         cursor = connection.execute(
-            "INSERT INTO assistant_notes(kind,title,content) VALUES(?,?,?)",
-            (kind, title, content),
+            """INSERT INTO assistant_notes(kind,title,content,expires_at)
+            VALUES(?,?,?,?)""",
+            (kind, title, content, expires_at),
         )
         return int(cursor.lastrowid)
 
 
-def list_notes(kind: str, limit: int = 100) -> list[dict]:
+def list_notes(
+    kind: str, limit: int = 100, include_expired: bool = False
+) -> list[dict]:
     if kind not in NOTE_KINDS:
         raise ValueError("نوع المعلومة غير مدعوم.")
+    expiry_filter = (
+        ""
+        if include_expired
+        else "AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)"
+    )
     with db() as connection:
         rows = connection.execute(
-            """SELECT id,kind,title,content,created_at FROM assistant_notes
-            WHERE kind=? ORDER BY id DESC LIMIT ?""",
+            f"""SELECT id,kind,title,content,created_at,expires_at FROM assistant_notes
+            WHERE kind=? {expiry_filter} ORDER BY id DESC LIMIT ?""",
             (kind, max(0, limit)),
         ).fetchall()
-    columns = ("id", "kind", "title", "content", "created_at")
+    columns = ("id", "kind", "title", "content", "created_at", "expires_at")
     return [{column: row[column] for column in columns} for row in rows]
 
 

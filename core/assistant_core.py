@@ -70,6 +70,42 @@ def build_tools(root):
     return tools
 
 
+MAX_HISTORY_MESSAGES = 24
+MAX_HISTORY_CHARS = 48_000
+
+
+def _bounded_history(
+    history, max_messages=MAX_HISTORY_MESSAGES, max_chars=MAX_HISTORY_CHARS
+):
+    """Keep the newest valid turns within a predictable prompt-size budget."""
+    if max_messages <= 0 or max_chars <= 0:
+        return []
+    messages = [
+        {**message, "content": str(message.get("content", ""))}
+        for message in history
+        if isinstance(message, dict) and message.get("role") in {"user", "assistant"}
+    ][-max_messages:]
+
+    selected = []
+    used_chars = 0
+    for message in reversed(messages):
+        content = message["content"]
+        if used_chars + len(content) <= max_chars:
+            selected.append(message)
+            used_chars += len(content)
+            continue
+        if not selected:
+            marker = "\n[اقتُطع جزء من الرسالة لضبط طول السياق]"
+            clipped_content = (
+                content[:max_chars]
+                if max_chars <= len(marker)
+                else content[: max_chars - len(marker)] + marker
+            )
+            selected.append({**message, "content": clipped_content[:max_chars]})
+        break
+    return list(reversed(selected))
+
+
 def dispatch(name, args, root, proposals, log):
     if name == "web_read":
         result = fetch_webpage(args["url"])
@@ -130,14 +166,19 @@ def run_assistant(
             log.append(f"تعذر تحميل الذاكرة المحلية: {type(exc).__name__}")
 
     # التحقق مما إذا كان الموديل يدعم الأدوات
-    supports_tools = not (
-        "groq" in provider.base_url.lower() and provider.model not in GROQ_TOOL_MODELS
-    )
+    supports_tools = provider.supports_tools
+    if supports_tools is None:
+        supports_tools = not (
+            "groq" in provider.base_url.lower()
+            and provider.model not in GROQ_TOOL_MODELS
+        )
 
     # إذا كان الموديل لا يدعم الأدوات، لا نرسلها
     tools = build_tools(root) if supports_tools else None
 
-    messages = [{"role": "system", "content": system_prompt}] + history[-24:]
+    messages = [{"role": "system", "content": system_prompt}] + _bounded_history(
+        history
+    )
 
     for _ in range(max_rounds):
         # نرسل الأدوات فقط إذا كانت مدعومة

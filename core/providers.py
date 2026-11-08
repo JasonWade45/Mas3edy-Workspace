@@ -15,6 +15,45 @@ PRESETS = {
     "Custom OpenAI-compatible": "",
 }
 MAX_MODELS_RESPONSE_BYTES = 2_000_000
+AUTO_MODEL_OPTION = "تلقائي حسب المهمة"
+
+
+def select_model_for_task(models, prompt, mode="chat", default_model=""):
+    """Choose a saved model by role-like name hints; fall back to the user's default."""
+    candidates = list(
+        dict.fromkeys(model for model in models if isinstance(model, str) and model)
+    )
+    if not candidates:
+        return default_model or ""
+
+    query = str(prompt or "").casefold()
+    code_task = mode == "code" or any(
+        word in query
+        for word in ("code", "python", "debug", "bug", "كود", "برمج", "خطأ", "تصحيح")
+    )
+    complex_task = len(query) > 700 or any(
+        word in query
+        for word in ("analyze", "compare", "reason", "حلل", "قارن", "خطة", "استراتيجية")
+    )
+
+    if code_task:
+        role_hints = ("coder", "coding", "code", "codestral", "devstral")
+    elif complex_task:
+        role_hints = ("reason", "thinking", "70b", "120b", "pro", "opus", "sonnet")
+    else:
+        role_hints = ("instant", "flash", "mini", "8b", "haiku", "small")
+
+    selected = next(
+        (
+            model
+            for model in candidates
+            if any(hint in model.casefold() for hint in role_hints)
+        ),
+        None,
+    )
+    if selected:
+        return selected
+    return default_model if default_model in candidates else candidates[0]
 
 
 @dataclass
@@ -23,6 +62,7 @@ class Provider:
     base_url: str
     api_key: str
     model: str
+    supports_tools: bool | None = None
 
 
 def make_client(provider: Provider):
