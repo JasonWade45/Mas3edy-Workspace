@@ -8,7 +8,7 @@ from core.storage import load_config
 
 
 def main():
-    parser = argparse.ArgumentParser(description="عرض موديلات مزود محفوظ في مساعدي")
+    parser = argparse.ArgumentParser(description="عرض موديلات مزود محفوظ في N.O.V.A AI")
     parser.add_argument("--provider", help="اسم المزود المحفوظ")
     args = parser.parse_args()
     cfg = load_config()

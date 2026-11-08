@@ -19,7 +19,7 @@ def fetch_webpage(url: str, max_chars: int = 18_000) -> str:
         timeout=(5, 15),
         allow_redirects=False,
         stream=True,
-        headers={"User-Agent": "Mas3edyAssistant/1.0"},
+        headers={"User-Agent": "NOVA-AI/1.0"},
     ) as response:
         if 300 <= response.status_code < 400:
             raise ValueError(

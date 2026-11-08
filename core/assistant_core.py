@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from .filetools import list_files, make_proposal, read_file
+from .i18n import translate
 from .network import fetch_webpage
 from .personalization import retrieve_personal_context
 from .providers import Provider, chat_completion
@@ -36,33 +37,53 @@ def tool_schema(name, description, properties, required=None):
     }
 
 
-def build_tools(root):
+def build_tools(root, language="ar"):
+    def tr(ar, en):
+        return translate(ar, en, language)
+
     tools = [
         tool_schema(
             "web_read",
-            "قراءة صفحة ويب عامة عبر HTTPS",
+            tr("قراءة صفحة ويب عامة عبر HTTPS", "Read a public webpage over HTTPS"),
             {"url": {"type": "string"}},
             ["url"],
         ),
     ]
     if root:
         tools += [
-            tool_schema("list_files", "عرض الملفات النصية في المجلد المصرح به", {}, []),
+            tool_schema(
+                "list_files",
+                tr(
+                    "عرض الملفات النصية في المجلد المصرح به",
+                    "List text files in the approved folder",
+                ),
+                {},
+                [],
+            ),
             tool_schema(
                 "read_file",
-                "قراءة ملف نصي داخل المجلد المصرح به",
+                tr(
+                    "قراءة ملف نصي داخل المجلد المصرح به",
+                    "Read a text file inside the approved folder",
+                ),
                 {"path": {"type": "string"}},
                 ["path"],
             ),
             tool_schema(
                 "propose_write",
-                "اقتراح إنشاء أو تعديل ملف؛ لا ينفذ قبل موافقة المستخدم",
+                tr(
+                    "اقتراح إنشاء أو تعديل ملف؛ لا ينفذ قبل موافقة المستخدم",
+                    "Propose creating or editing a file; do not apply it without user approval",
+                ),
                 {"path": {"type": "string"}, "content": {"type": "string"}},
                 ["path", "content"],
             ),
             tool_schema(
                 "propose_move",
-                "اقتراح نقل أو إعادة تسمية ملف؛ لا ينفذ قبل الموافقة",
+                tr(
+                    "اقتراح نقل أو إعادة تسمية ملف؛ لا ينفذ قبل الموافقة",
+                    "Propose moving or renaming a file; do not apply it without approval",
+                ),
                 {"source": {"type": "string"}, "destination": {"type": "string"}},
                 ["source", "destination"],
             ),
@@ -75,7 +96,10 @@ MAX_HISTORY_CHARS = 48_000
 
 
 def _bounded_history(
-    history, max_messages=MAX_HISTORY_MESSAGES, max_chars=MAX_HISTORY_CHARS
+    history,
+    max_messages=MAX_HISTORY_MESSAGES,
+    max_chars=MAX_HISTORY_CHARS,
+    language="ar",
 ):
     """Keep the newest valid turns within a predictable prompt-size budget."""
     if max_messages <= 0 or max_chars <= 0:
@@ -95,7 +119,11 @@ def _bounded_history(
             used_chars += len(content)
             continue
         if not selected:
-            marker = "\n[اقتُطع جزء من الرسالة لضبط طول السياق]"
+            marker = (
+                "\n[Message shortened to fit context]"
+                if language == "en"
+                else "\n[اقتُطع جزء من الرسالة لضبط طول السياق]"
+            )
             clipped_content = (
                 content[:max_chars]
                 if max_chars <= len(marker)
@@ -106,14 +134,19 @@ def _bounded_history(
     return list(reversed(selected))
 
 
-def dispatch(name, args, root, proposals, log):
+def dispatch(name, args, root, proposals, log, language="ar"):
+    def tr(ar, en):
+        return translate(ar, en, language)
+
     if name == "web_read":
         result = fetch_webpage(args["url"])
         log.append("قراءة صفحة ويب")
         audit("web_read", "قراءة صفحة ويب عامة")
         return result
     if name == "list_files" and root:
-        result = "\n".join(list_files(root)) or "لا توجد ملفات نصية مدعومة."
+        result = "\n".join(list_files(root)) or tr(
+            "لا توجد ملفات نصية مدعومة.", "No supported text files found."
+        )
         log.append("استعراض ملفات المجلد")
         audit("list_files", "استعراض مجلد مصرح به")
         return result
@@ -128,15 +161,21 @@ def dispatch(name, args, root, proposals, log):
         )
         log.append("إنشاء مقترح تعديل: " + args["path"])
         audit("propose_write", args["path"])
-        return "تم إنشاء مقترح ينتظر موافقة المستخدم."
+        return tr(
+            "تم إنشاء مقترح ينتظر موافقة المستخدم.",
+            "A file proposal is ready and awaits your approval.",
+        )
     if name == "propose_move" and root:
         proposals.append(
             make_proposal(root, "move", args["source"], destination=args["destination"])
         )
         log.append(f"إنشاء مقترح نقل: {args['source']} → {args['destination']}")
         audit("propose_move", f"{args['source']} -> {args['destination']}")
-        return "تم إنشاء مقترح نقل ينتظر موافقة المستخدم."
-    return "الأداة غير مفعلة أو غير معروفة."
+        return tr(
+            "تم إنشاء مقترح نقل ينتظر موافقة المستخدم.",
+            "A move proposal is ready and awaits your approval.",
+        )
+    return tr("الأداة غير مفعلة أو غير معروفة.", "Tool is unavailable or unknown.")
 
 
 def run_assistant(
@@ -146,6 +185,7 @@ def run_assistant(
     root=None,
     max_rounds=6,
     personalization_enabled=True,
+    language="ar",
 ):
     proposals, log = [], []
     if personalization_enabled:
@@ -158,7 +198,11 @@ def run_assistant(
             "",
         )
         try:
-            personal_context = retrieve_personal_context(last_user_message)
+            personal_context = (
+                retrieve_personal_context(last_user_message, language=language)
+                if language == "en"
+                else retrieve_personal_context(last_user_message)
+            )
             if personal_context:
                 system_prompt = f"{system_prompt}\n\n{personal_context}"
         except Exception as exc:
@@ -174,10 +218,10 @@ def run_assistant(
         )
 
     # إذا كان الموديل لا يدعم الأدوات، لا نرسلها
-    tools = build_tools(root) if supports_tools else None
+    tools = build_tools(root, language=language) if supports_tools else None
 
     messages = [{"role": "system", "content": system_prompt}] + _bounded_history(
-        history
+        history, language=language
     )
 
     for _ in range(max_rounds):
@@ -210,9 +254,11 @@ def run_assistant(
                 args = json.loads(call.function.arguments or "{}")
                 if not isinstance(args, dict):
                     raise TypeError("وسائط الأداة يجب أن تكون كائن JSON.")
-                result = dispatch(call.function.name, args, root, proposals, log)
+                result = dispatch(
+                    call.function.name, args, root, proposals, log, language=language
+                )
             except Exception as exc:
-                result = f"تعذر تنفيذ الأداة: {exc}"
+                result = f"{translate('تعذر تنفيذ الأداة', 'Tool execution failed', language)}: {exc}"
             messages.append(
                 {
                     "role": "tool",
@@ -220,4 +266,12 @@ def run_assistant(
                     "content": str(result)[:20000],
                 }
             )
-    return "وصل المساعد إلى حد خطوات الأدوات. وضّح المهمة أو قسّمها.", proposals, log
+    return (
+        translate(
+            "وصل المساعد إلى حد خطوات الأدوات. وضّح المهمة أو قسّمها.",
+            "The assistant reached the tool-call limit. Clarify or split the task.",
+            language,
+        ),
+        proposals,
+        log,
+    )
