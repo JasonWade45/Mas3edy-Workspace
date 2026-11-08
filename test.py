@@ -4,13 +4,39 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from core.assistant_core import _bounded_history, run_assistant
+from core.assistant_core import _bounded_history, build_tools, run_assistant
 from core.filetools import approve_proposal, make_proposal, read_file
+from core.i18n import normalize_language, text_direction, translate
 from core.network import fetch_webpage
 from core.personalization import compose_system_prompt, retrieve_personal_context
 from core.providers import Provider, list_models, select_model_for_task
 from core.security import is_sensitive, resolve_inside, validate_provider_base_url
 from core.storage import add_note, delete_note, list_notes
+
+
+class InterfaceLanguageTests(unittest.TestCase):
+    def test_language_selection_normalizes_and_translates(self):
+        self.assertEqual(normalize_language("en"), "en")
+        self.assertEqual(normalize_language("unsupported"), "ar")
+        self.assertEqual(text_direction("en"), "ltr")
+        self.assertEqual(text_direction("ar"), "rtl")
+        self.assertEqual(translate("مرحبا", "Hello", "en"), "Hello")
+        self.assertEqual(translate("مرحبا", "Hello", "ar"), "مرحبا")
+
+    def test_english_system_prompt_uses_english_quality_and_style_guidance(self):
+        prompt = compose_system_prompt(
+            "Answer clearly", response_style="مختصر", language="en"
+        )
+        self.assertIn("Quality standards:", prompt)
+        self.assertIn("Selected response style: Concise", prompt)
+        self.assertNotIn("قواعد جودة العمل", prompt)
+
+    def test_tool_descriptions_follow_selected_language(self):
+        tools = build_tools("approved-folder", language="en")
+        descriptions = [tool["function"]["description"] for tool in tools]
+        self.assertIn("Read a public webpage over HTTPS", descriptions)
+        self.assertIn("List text files in the approved folder", descriptions)
+        self.assertFalse(any("قراءة" in description for description in descriptions))
 
 
 class SecurityAndApprovalTests(unittest.TestCase):
@@ -264,6 +290,20 @@ class PersonalizationTests(unittest.TestCase):
             self.assertIn("Python setup", context)
             self.assertIn("virtual environment", context)
 
+    def test_retrieved_context_uses_selected_language(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database = Path(temp_dir) / "assistant.sqlite3"
+            with patch("core.storage.DB_PATH", database):
+                note_id = add_note(
+                    "knowledge", "Python setup", "Create a virtual environment."
+                )
+                context = retrieve_personal_context(
+                    "How to set up Python", language="en"
+                )
+                self.assertIn("Related local references", context)
+                self.assertIn(f"[Reference: knowledge #{note_id}]", context)
+                self.assertNotIn("مراجع محلية", context)
+
     def test_expired_memory_is_not_retrieved_but_remains_manageable(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             database = Path(temp_dir) / "assistant.sqlite3"
@@ -318,6 +358,16 @@ class PersonalizationTests(unittest.TestCase):
         sent_messages = mock_completion.call_args.args[1]
         self.assertEqual(sent_messages[0]["content"], "base prompt")
         mock_retrieve.assert_not_called()
+
+        mock_completion.reset_mock()
+        run_assistant(
+            provider,
+            history,
+            "English prompt",
+            personalization_enabled=True,
+            language="en",
+        )
+        mock_retrieve.assert_called_once_with("question", language="en")
 
 
 class ModelRoutingTests(unittest.TestCase):

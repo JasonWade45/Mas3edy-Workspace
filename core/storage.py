@@ -8,6 +8,7 @@ from pathlib import Path
 
 from platformdirs import user_data_dir
 
+# Preserve the legacy data directory so existing chats, notes, and settings are not orphaned.
 DATA_DIR = Path(user_data_dir("Mas3edy", "PersonalAssistant"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "assistant.sqlite3"
@@ -74,6 +75,7 @@ def load_config() -> dict:
             "providers": [],
             "active_provider": "",
             "active_model": "",
+            "language": "ar",
         }
 
 

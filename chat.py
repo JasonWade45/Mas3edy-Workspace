@@ -26,7 +26,7 @@ def main():
         if cfg.get("personalization_enabled", True)
         else "",
     )
-    print("مساعدي - اكتب exit للخروج")
+    print("N.O.V.A AI - اكتب exit للخروج")
     while True:
         prompt = input("\nأنت: ").strip()
         if prompt.lower() in {"exit", "quit"}:
@@ -38,7 +38,7 @@ def main():
             system_prompt,
             personalization_enabled=cfg.get("personalization_enabled", True),
         )
-        print("\nمساعدي:", answer)
+        print("\nN.O.V.A AI:", answer)
         if proposals:
             print("ملاحظة: مقترحات الملفات متاحة داخل واجهة Streamlit فقط.")
         history.append({"role": "assistant", "content": answer})

@@ -7,6 +7,7 @@ try:
 except Exception:  # Keyring may be unavailable on a headless/local system.
     keyring = None
 
+# Keep the legacy keyring service ID so existing provider keys remain available after rebranding.
 SERVICE = "Mas3edyPersonalAssistant"
 
 

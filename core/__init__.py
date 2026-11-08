@@ -1,1 +1,1 @@
-"""Core functionality for Mas3edy Workspace."""
+"""Core functionality for N.O.V.A AI."""
