@@ -40,7 +40,22 @@ pre, code {
     var(--bg) !important;
 }
 
-#MainMenu, footer, header { visibility: hidden; }
+#MainMenu, footer { visibility: hidden; }
+
+header[data-testid="stHeader"] {
+  visibility: visible !important;
+  background: transparent !important;
+}
+
+header[data-testid="stHeader"] [data-testid="stToolbar"] {
+  background: transparent !important;
+}
+
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
 
 .main .block-container {
   direction: var(--nova-direction, rtl);
