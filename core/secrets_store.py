@@ -1,11 +1,18 @@
 from __future__ import annotations
+
 import os
+
 try:
     import keyring
-except Exception:
+except Exception:  # Keyring may be unavailable on a headless/local system.
     keyring = None
 
 SERVICE = "Mas3edyPersonalAssistant"
+
+
+def _env_name(name: str) -> str:
+    return f"MAS3EDY_{name.upper()}"
+
 
 def set_secret(name: str, value: str) -> str:
     if not value:
@@ -14,15 +21,19 @@ def set_secret(name: str, value: str) -> str:
     if keyring:
         try:
             keyring.set_password(SERVICE, name, value)
+            # Do not let a stale fallback value shadow the newly stored key.
+            os.environ.pop(_env_name(name), None)
             return "keyring"
         except Exception:
             pass
-    # Deliberately do not write secrets to JSON. Session/env only fallback.
-    os.environ[f"MAS3EDY_{name.upper()}"] = value
+    # Deliberately do not write secrets to JSON. The fallback lasts only for
+    # the lifetime of this application process.
+    os.environ[_env_name(name)] = value
     return "session"
 
+
 def get_secret(name: str) -> str | None:
-    env = os.environ.get(f"MAS3EDY_{name.upper()}")
+    env = os.environ.get(_env_name(name))
     if env:
         return env
     if keyring:
@@ -32,10 +43,18 @@ def get_secret(name: str) -> str | None:
             return None
     return None
 
-def delete_secret(name: str) -> None:
-    os.environ.pop(f"MAS3EDY_{name.upper()}", None)
-    if keyring:
+
+def delete_secret(name: str) -> bool:
+    os.environ.pop(_env_name(name), None)
+    if not keyring:
+        return True
+    try:
+        keyring.delete_password(SERVICE, name)
+        return True
+    except Exception:
+        # Some keyring backends raise when the entry does not exist. Confirm
+        # whether the secret remains before reporting a deletion failure.
         try:
-            keyring.delete_password(SERVICE, name)
+            return keyring.get_password(SERVICE, name) is None
         except Exception:
-            pass
+            return False
