@@ -676,7 +676,7 @@ if tab == "لوحة التحكم":
             f"""
         <div class="metric-card">
             <div class="metric-label">{t("التخصيص المحلي", "Local personalization")}</div>
-            <div class="metric-value" style="color: #48D6D2; font-size: 1.8rem; margin-top: 15px;">{t("مفعّل", "On") if cfg.get("personalization_enabled", True) else t("متوقف", "Off")}</div>
+            <div class="metric-value" style="color: #3E6F63; font-size: 1.8rem; margin-top: 15px;">{t("مفعّل", "On") if cfg.get("personalization_enabled", True) else t("متوقف", "Off")}</div>
         </div>
         """,
             unsafe_allow_html=True,
