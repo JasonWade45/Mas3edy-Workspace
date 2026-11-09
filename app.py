@@ -149,7 +149,7 @@ def operation_result_text(message):
 # Local theme; direction follows the selected interface language.
 theme_css = Path(__file__).with_name("theme.css").read_text(encoding="utf-8")
 st.markdown(
-    f"<style>{theme_css} :root {{ --nova-direction: {layout_direction}; --nova-shift: {'-2px' if language == 'ar' else '2px'}; --nova-heading-spacing: {'0' if language == 'ar' else '-0.025em'}; --nova-display-spacing: {'0' if language == 'ar' else '0.12em'}; }}</style>",
+    f"<style>{theme_css} :root {{ --nova-direction: {layout_direction}; --nova-flex-direction: {'row-reverse' if layout_direction == 'rtl' else 'row'}; --nova-shift: {'-2px' if language == 'ar' else '2px'}; --nova-heading-spacing: {'0' if language == 'ar' else '-0.025em'}; --nova-display-spacing: {'0' if language == 'ar' else '0.12em'}; }}</style>",
     unsafe_allow_html=True,
 )
 
@@ -791,7 +791,19 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
         st.session_state["chat_provider_selector"] = active
 
     with st.container(key="chat_toolbar"):
-        provider_col, model_col, refresh_col, style_col = st.columns([1, 1.5, 1, 1])
+        st.markdown(
+            f"""
+            <div class="chat-toolbar-heading">
+              <div class="chat-toolbar-copy">
+                <strong>{t("إعدادات المحادثة", "Chat setup")}</strong>
+                <span>{t("اختر المزود والموديل، ثم اضبط أسلوب الإجابة.", "Choose a provider and model, then set your response style.")}</span>
+              </div>
+              <span class="chat-toolbar-mark" aria-hidden="true">01</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        provider_col, model_col, style_col = st.columns([1, 2, 1])
         with provider_col:
             selected = st.selectbox(
                 t("المزود", "Provider"),
@@ -803,83 +815,90 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
         model_options = chat_model_options(p_cfg, selected)
         model_key = f"chat_model_{selected}"
         with model_col:
-            if model_options:
-                preferred_model = (
-                    AUTO_MODEL_OPTION
-                    if p_cfg.get("model_mode") == "auto"
-                    else p_cfg.get("model") or model_options[0]
-                )
-                if st.session_state.get(model_key) not in model_options:
-                    st.session_state[model_key] = preferred_model
-                model_override = st.selectbox(
-                    t("الموديل", "Model"),
-                    model_options,
-                    format_func=lambda value: (
-                        t("تلقائي حسب المهمة", "Automatic by task")
-                        if value == AUTO_MODEL_OPTION
-                        else value
-                    ),
-                    key=model_key,
-                    on_change=persist_chat_model_selection,
-                    args=(selected,),
-                )
-            else:
-                model_override = st.text_input(
-                    "Model ID",
-                    value=p_cfg.get("model", ""),
-                    key=model_key,
-                    on_change=persist_chat_model_selection,
-                    args=(selected,),
-                )
+            model_select_col, refresh_col = st.columns(
+                [4, 1], vertical_alignment="bottom"
+            )
+            with model_select_col:
+                if model_options:
+                    preferred_model = (
+                        AUTO_MODEL_OPTION
+                        if p_cfg.get("model_mode") == "auto"
+                        else p_cfg.get("model") or model_options[0]
+                    )
+                    if st.session_state.get(model_key) not in model_options:
+                        st.session_state[model_key] = preferred_model
+                    model_override = st.selectbox(
+                        t("الموديل", "Model"),
+                        model_options,
+                        format_func=lambda value: (
+                            t("تلقائي حسب المهمة", "Automatic by task")
+                            if value == AUTO_MODEL_OPTION
+                            else value
+                        ),
+                        key=model_key,
+                        on_change=persist_chat_model_selection,
+                        args=(selected,),
+                    )
+                else:
+                    model_override = st.text_input(
+                        "Model ID",
+                        value=p_cfg.get("model", ""),
+                        key=model_key,
+                        on_change=persist_chat_model_selection,
+                        args=(selected,),
+                    )
 
-        with refresh_col:
-            if st.button(
-                t("تحديث الموديلات", "Refresh models"),
-                key=f"refresh_chat_models_{selected}",
-                help=t(
-                    "يجلب قائمة الموديلات من المزود المحدد لتختار منها هنا.",
-                    "Fetch the available models from this provider.",
-                ),
-            ):
-                try:
-                    with st.spinner(t("جاري جلب الموديلات...", "Fetching models...")):
-                        discovered_models = list_models(
-                            Provider(
-                                selected,
-                                p_cfg.get("base_url", ""),
-                                get_secret("provider_" + selected) or "",
-                                p_cfg.get("model", ""),
+            with refresh_col:
+                if st.button(
+                    t("تحديث", "Refresh"),
+                    key=f"refresh_chat_models_{selected}",
+                    help=t(
+                        "يجلب قائمة الموديلات من المزود المحدد لتختار منها هنا.",
+                        "Fetch the available models from this provider.",
+                    ),
+                ):
+                    try:
+                        with st.spinner(
+                            t("جاري جلب الموديلات...", "Fetching models...")
+                        ):
+                            discovered_models = list_models(
+                                Provider(
+                                    selected,
+                                    p_cfg.get("base_url", ""),
+                                    get_secret("provider_" + selected) or "",
+                                    p_cfg.get("model", ""),
+                                )
+                            )
+                        saved_models = p_cfg.get("models", [])
+                        if not isinstance(saved_models, list):
+                            saved_models = []
+                        current_model = p_cfg.get("model", "")
+                        if not isinstance(current_model, str):
+                            current_model = ""
+                        p_cfg["models"] = sorted(
+                            set(discovered_models + saved_models + [current_model])
+                            - {""}
+                        )
+                        st.session_state.model_inventory = p_cfg["models"]
+                        st.session_state.model_inventory_provider = selected
+                        save_config(cfg)
+                        st.session_state.model_refresh_notice = (
+                            t(
+                                f"تم تحديث قائمة {selected}: {len(discovered_models)} موديلًا.",
+                                f"Updated {selected}: {len(discovered_models)} models found.",
+                            )
+                            if discovered_models
+                            else t(
+                                "لم يُرجع المزود موديلات جديدة؛ أبقينا القائمة المحفوظة.",
+                                "The provider returned no new models; the saved list was kept.",
                             )
                         )
-                    saved_models = p_cfg.get("models", [])
-                    if not isinstance(saved_models, list):
-                        saved_models = []
-                    current_model = p_cfg.get("model", "")
-                    if not isinstance(current_model, str):
-                        current_model = ""
-                    p_cfg["models"] = sorted(
-                        set(discovered_models + saved_models + [current_model]) - {""}
-                    )
-                    st.session_state.model_inventory = p_cfg["models"]
-                    st.session_state.model_inventory_provider = selected
-                    save_config(cfg)
-                    st.session_state.model_refresh_notice = (
-                        t(
-                            f"تم تحديث قائمة {selected}: {len(discovered_models)} موديلًا.",
-                            f"Updated {selected}: {len(discovered_models)} models found.",
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(
+                            t("تعذر تحديث الموديلات", "Could not refresh models")
+                            + f": {exc}"
                         )
-                        if discovered_models
-                        else t(
-                            "لم يُرجع المزود موديلات جديدة؛ أبقينا القائمة المحفوظة.",
-                            "The provider returned no new models; the saved list was kept.",
-                        )
-                    )
-                    st.rerun()
-                except Exception as exc:
-                    st.error(
-                        t("تعذر تحديث الموديلات", "Could not refresh models")
-                        + f": {exc}"
-                    )
 
         with style_col:
             response_style = st.selectbox(
@@ -915,8 +934,11 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
         "yes": t("نعم", "Yes"),
         "no": t("لا", "No"),
     }
-    with st.expander(
-        t("خصائص الموديل المحدد", "Selected model options"), expanded=False
+    with (
+        st.container(key="chat_model_options"),
+        st.expander(
+            t("خيارات متقدمة للموديل", "Advanced model settings"), expanded=False
+        ),
     ):
         tool_support_choice = st.selectbox(
             t("استدعاء الأدوات لهذا الموديل", "Tool calling for this model"),
@@ -950,8 +972,11 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
 
     root = None
     if st.session_state.mode == "code":
-        with st.expander(
-            t("إعدادات بيئة البرمجة", "Code workspace settings"), expanded=False
+        with (
+            st.container(key="code_workspace_options"),
+            st.expander(
+                t("إعدادات بيئة البرمجة", "Code workspace settings"), expanded=False
+            ),
         ):
             roots = cfg.get("granted_roots", [])
             if roots:
@@ -998,14 +1023,16 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
                 "Relevant local notes may be sent to the provider.",
             )
         )
-    st.caption(" · ".join(model_status))
-    if st.session_state.get("model_refresh_notice"):
-        st.success(st.session_state.pop("model_refresh_notice"))
+    with st.container(key="chat_status"):
+        st.caption(" · ".join(model_status))
 
-    if st.session_state.get("example_notice"):
-        st.success(st.session_state.pop("example_notice"))
-    if st.session_state.get("chat_save_warning"):
-        st.warning(st.session_state.pop("chat_save_warning"))
+    with st.container(key="chat_notices"):
+        if st.session_state.get("model_refresh_notice"):
+            st.success(st.session_state.pop("model_refresh_notice"))
+        if st.session_state.get("example_notice"):
+            st.success(st.session_state.pop("example_notice"))
+        if st.session_state.get("chat_save_warning"):
+            st.warning(st.session_state.pop("chat_save_warning"))
 
     if not st.session_state.messages:
         st.markdown(
