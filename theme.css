@@ -1,17 +1,18 @@
-/* N.O.V.A AI — warm, quiet workspace theme with a clear Arabic/English rhythm. */
+/* N.O.V.A AI — Paper & Ink: a warm, readable bilingual workspace. */
 :root {
-  color-scheme: dark;
-  --bg: #101311;
-  --surface: #171d19;
-  --surface-strong: #202923;
-  --surface-raised: #252e28;
-  --line: rgba(197, 205, 183, 0.14);
-  --muted: #a5ada3;
-  --text: #eceae2;
-  --sage: #bac6aa;
-  --sage-deep: #50634f;
-  --brass: #d0ad79;
-  --radius: 18px;
+  color-scheme: light;
+  --bg: #f4f2ec;
+  --surface: #fffefa;
+  --surface-strong: #ebe9e1;
+  --surface-raised: #ffffff;
+  --line: #e3ded4;
+  --muted: #758078;
+  --text: #202723;
+  --green: #3e6f63;
+  --green-deep: #2e574d;
+  --green-wash: #e7f0ec;
+  --rust: #b8795c;
+  --radius: 16px;
   --nova-direction: rtl;
   --nova-shift: -2px;
   --nova-heading-spacing: 0;
@@ -35,15 +36,14 @@ pre, code {
 
 .stApp {
   color: var(--text) !important;
-  background:
-    radial-gradient(1100px circle at 92% -18%, rgba(125, 146, 111, 0.09), transparent 58%),
-    var(--bg) !important;
+  background: var(--bg) !important;
 }
 
 #MainMenu, footer { visibility: hidden; }
 
 header[data-testid="stHeader"] {
   visibility: visible !important;
+  color: var(--text);
   background: transparent !important;
 }
 
@@ -60,13 +60,14 @@ header[data-testid="stHeader"] [data-testid="stToolbar"] {
 .main .block-container {
   direction: var(--nova-direction, rtl);
   text-align: start;
-  max-width: 1320px;
-  padding: 1.35rem clamp(1rem, 3.5vw, 2.7rem) 3.5rem;
+  max-width: 1260px;
+  padding: 1.35rem clamp(1rem, 3.5vw, 2.6rem) 3.5rem;
 }
 
 [data-testid="stSidebar"] {
   direction: var(--nova-direction, rtl);
-  background: #141a16 !important;
+  color: var(--text);
+  background: #ebe9e1 !important;
   border-inline-start: 1px solid var(--line);
 }
 
@@ -89,7 +90,7 @@ header[data-testid="stHeader"] [data-testid="stToolbar"] {
 
 .sidebar-brand strong {
   color: var(--text);
-  font-size: 1.14rem;
+  font-size: 1.12rem;
   letter-spacing: 0.015em;
 }
 
@@ -104,22 +105,22 @@ header[data-testid="stHeader"] [data-testid="stToolbar"] {
   width: 42px;
   height: 42px;
   place-items: center;
-  border: 1px solid rgba(186, 198, 170, 0.28);
+  border: 1px solid rgba(62, 111, 99, 0.22);
   border-radius: 13px;
-  color: var(--sage);
+  color: var(--green);
   font-size: 1rem;
   font-weight: 750;
   letter-spacing: -0.08em;
-  background: rgba(115, 133, 101, 0.16);
+  background: #f8f7f1;
 }
 
 [data-testid="stSidebar"] .stButton > button {
   width: 100%;
   min-height: 42px;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: 11px;
   padding: 0.58rem 0.85rem;
-  color: #b5bdb3;
+  color: #59645d;
   background: transparent;
   font-weight: 560;
   text-align: start;
@@ -129,22 +130,22 @@ header[data-testid="stHeader"] [data-testid="stToolbar"] {
 
 [data-testid="stSidebar"] .stButton > button:hover {
   color: var(--text);
-  background: rgba(186, 198, 170, 0.08);
-  border-color: rgba(197, 205, 183, 0.12);
+  background: rgba(255, 254, 250, 0.8);
+  border-color: #ddd8cd;
   transform: translateX(var(--nova-shift, -2px));
 }
 
 [data-testid="stSidebar"] .stButton > button[kind="primary"] {
-  color: #182018 !important;
-  background: var(--sage) !important;
-  border-color: rgba(186, 198, 170, 0.4) !important;
+  color: #ffffff !important;
+  background: var(--green) !important;
+  border-color: var(--green) !important;
   box-shadow: none;
 }
 
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
-  color: #8f998f;
+  color: #778078;
   letter-spacing: 0;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 }
 
 h1, h2, h3 {
@@ -167,10 +168,10 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 .stDownloadButton > button,
 [data-testid="stFormSubmitButton"] > button {
   min-height: 44px;
-  border: 1px solid rgba(197, 205, 183, 0.18);
-  border-radius: 12px;
+  border: 1px solid #d9ded8;
+  border-radius: 11px;
   color: var(--text) !important;
-  background: #202823 !important;
+  background: #fffefa !important;
   font-weight: 620;
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
@@ -178,27 +179,34 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 .main .stButton > button[kind="primary"],
 .stDownloadButton > button[kind="primary"],
 [data-testid="stFormSubmitButton"] > button[kind="primary"] {
-  border-color: rgba(186, 198, 170, 0.4) !important;
-  color: #172019 !important;
-  background: var(--sage) !important;
+  border-color: var(--green) !important;
+  color: #ffffff !important;
+  background: var(--green) !important;
 }
 
 .main .stButton > button:hover,
 .stDownloadButton > button:hover,
 [data-testid="stFormSubmitButton"] > button:hover {
-  border-color: rgba(197, 205, 183, 0.34);
-  background: #2a352d !important;
+  border-color: #9eb8ad;
+  background: #f6faf7 !important;
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 7px 18px rgba(38, 54, 44, 0.09);
+}
+
+.main .stButton > button[kind="primary"]:hover,
+.stDownloadButton > button[kind="primary"]:hover,
+[data-testid="stFormSubmitButton"] > button[kind="primary"]:hover {
+  color: #ffffff !important;
+  background: var(--green-deep) !important;
 }
 
 [data-testid="stTextInput"] input,
 [data-testid="stTextArea"] textarea,
 [data-testid="stSelectbox"] [data-baseweb="select"] > div {
-  border-radius: 12px !important;
-  border-color: var(--line) !important;
+  border-radius: 11px !important;
+  border-color: #d9ded8 !important;
   color: var(--text) !important;
-  background: #171e19 !important;
+  background: #fffefa !important;
 }
 
 [data-testid="stTextInput"] input,
@@ -208,30 +216,30 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 
 [data-testid="stTextInput"] input::placeholder,
 [data-testid="stTextArea"] textarea::placeholder {
-  color: var(--muted) !important;
+  color: #8a948d !important;
   opacity: 1;
 }
 
 [data-testid="stTextInput"] input:focus,
 [data-testid="stTextArea"] textarea:focus {
-  border-color: rgba(186, 198, 170, 0.62) !important;
-  box-shadow: 0 0 0 2px rgba(186, 198, 170, 0.12) !important;
+  border-color: rgba(62, 111, 99, 0.62) !important;
+  box-shadow: 0 0 0 2px rgba(62, 111, 99, 0.11) !important;
 }
 
 [data-testid="stExpander"] {
   border: 1px solid var(--line) !important;
-  border-radius: 14px !important;
-  background: rgba(23, 29, 25, 0.72);
+  border-radius: 13px !important;
+  background: rgba(255, 254, 250, 0.8);
 }
 
 [data-testid="stChatMessage"] {
   width: min(100%, 940px);
   margin: 0 auto 0.85rem;
-  padding: 0.55rem 0.9rem;
+  padding: 0.6rem 0.95rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(23, 29, 25, 0.92);
-  box-shadow: none;
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgba(39, 48, 40, 0.035);
 }
 
 [data-testid="stChatMessage"] p {
@@ -239,18 +247,18 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 }
 
 [data-testid="stChatMessage"] [data-testid="stCaptionContainer"] p {
-  color: var(--brass);
-  font-size: 0.76rem;
+  color: var(--green);
+  font-size: 0.78rem;
   font-weight: 650;
 }
 
 [data-testid="stChatInput"] {
   width: min(100%, 980px);
   margin-inline: auto;
-  border: 1px solid rgba(186, 198, 170, 0.28) !important;
-  border-radius: 16px !important;
-  background: #171e19 !important;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+  border: 1px solid #c9d6ce !important;
+  border-radius: 15px !important;
+  background: #fffefa !important;
+  box-shadow: 0 8px 24px rgba(39, 48, 40, 0.08);
 }
 
 [data-testid="stChatInput"] textarea {
@@ -260,14 +268,16 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 [data-testid="stMetric"] {
   padding: 1.05rem 1.15rem;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #171e1a;
+  border-radius: 15px;
+  background: #fffefa;
+  box-shadow: 0 5px 18px rgba(39, 48, 40, 0.04);
 }
 
 [data-testid="stDataFrame"] {
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 13px;
   overflow: hidden;
+  background: #fffefa;
 }
 
 .hero-banner {
@@ -277,40 +287,40 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  min-height: 172px;
-  padding: clamp(1.4rem, 3.4vw, 2.45rem);
+  min-height: 168px;
+  padding: clamp(1.4rem, 3.4vw, 2.35rem);
   margin: 0.3rem 0 1.2rem;
-  border: 1px solid rgba(186, 198, 170, 0.18);
-  border-radius: 20px;
-  background: #1a211d;
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e2ddd2;
+  border-radius: 18px;
+  background: #ebe9e1;
 }
 
 .hero-banner::after {
   position: absolute;
-  inset-block: 1.2rem;
+  inset-block: 1.1rem;
   inset-inline-start: 0;
   width: 3px;
   border-radius: 3px;
-  background: var(--brass);
+  background: var(--rust);
   content: "";
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .hero-banner h2 {
   margin: 0.5rem 0 0.45rem;
-  font-size: clamp(1.55rem, 2.8vw, 2.15rem) !important;
+  color: var(--text) !important;
+  font-size: clamp(1.55rem, 2.8vw, 2.1rem) !important;
 }
 
 .hero-banner p {
   max-width: 660px;
   margin: 0;
-  color: #b9c0b5;
+  color: #5f6b63;
   font-size: 1rem;
 }
 
 .hero-eyebrow {
-  color: var(--brass);
+  color: var(--rust);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: var(--nova-display-spacing, 0);
@@ -318,40 +328,41 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 
 .hero-orbit {
   display: grid;
-  flex: 0 0 68px;
-  width: 68px;
-  height: 68px;
+  flex: 0 0 66px;
+  width: 66px;
+  height: 66px;
   place-items: center;
-  border: 1px solid rgba(186, 198, 170, 0.24);
-  border-radius: 16px;
-  color: var(--sage);
-  font-size: 1.25rem;
+  border: 1px solid rgba(62, 111, 99, 0.2);
+  border-radius: 15px;
+  color: var(--green);
+  font-size: 1.2rem;
   font-weight: 750;
   letter-spacing: -0.08em;
-  background: rgba(115, 133, 101, 0.12);
+  background: #f7f6f0;
 }
 
 .metric-card {
   height: 100%;
-  min-height: 136px;
+  min-height: 132px;
   margin-bottom: 0.6rem;
-  padding: 1.2rem 1.25rem;
+  padding: 1.15rem 1.2rem;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 15px;
   text-align: start;
-  background: #171e1a;
-  transition: border-color 150ms ease, background 150ms ease;
+  background: #fffefa;
+  box-shadow: 0 5px 18px rgba(39, 48, 40, 0.035);
+  transition: border-color 150ms ease, transform 150ms ease;
 }
 
 .metric-card:hover {
-  border-color: rgba(186, 198, 170, 0.34);
-  background: #1b241e;
+  border-color: #c2d1c8;
+  transform: translateY(-2px);
 }
 
 .metric-value {
   margin: 0.7rem 0 0.1rem;
-  color: var(--text);
-  font-size: 2.35rem;
+  color: var(--green);
+  font-size: 2.25rem;
   font-weight: 760;
   line-height: 1.1;
 }
@@ -364,8 +375,8 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 
 .section-kicker {
   margin: 1.2rem 0 0.35rem;
-  color: var(--brass);
-  font-size: 0.78rem;
+  color: var(--rust);
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: var(--nova-display-spacing, 0);
 }
@@ -373,8 +384,9 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 .callout-card {
   padding: 1.1rem 1.25rem;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #171e1a;
+  border-radius: 15px;
+  background: #fffefa;
+  box-shadow: 0 5px 18px rgba(39, 48, 40, 0.035);
 }
 
 .page-heading {
@@ -392,13 +404,14 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 }
 
 .page-eyebrow {
-  color: var(--brass);
+  color: var(--rust);
   font-size: 0.76rem;
   font-weight: 700;
 }
 
 .page-heading h1 {
   margin: 0.25rem 0 0.2rem;
+  color: var(--text) !important;
   font-size: clamp(1.8rem, 3vw, 2.35rem) !important;
 }
 
@@ -414,21 +427,21 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
   width: 52px;
   height: 52px;
   place-items: center;
-  border: 1px solid rgba(186, 198, 170, 0.22);
-  border-radius: 15px;
-  color: var(--sage);
+  border: 1px solid rgba(62, 111, 99, 0.2);
+  border-radius: 14px;
+  color: var(--green);
   font-size: 1rem;
   font-weight: 750;
   letter-spacing: -0.08em;
-  background: rgba(115, 133, 101, 0.11);
+  background: #f8f7f1;
 }
 
 .st-key-chat_toolbar {
   margin: 0.6rem 0 0.75rem;
   padding: 0.75rem 0.9rem 0.25rem;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(23, 29, 25, 0.76);
+  border-radius: 14px;
+  background: rgba(255, 254, 250, 0.94);
 }
 
 .st-key-chat_toolbar [data-testid="stSelectbox"] label,
@@ -453,16 +466,17 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
   width: 52px;
   height: 52px;
   place-items: center;
-  border: 1px solid rgba(186, 198, 170, 0.24);
-  border-radius: 16px;
-  color: var(--sage);
+  border: 1px solid rgba(62, 111, 99, 0.22);
+  border-radius: 15px;
+  color: var(--green);
   font-size: 1rem;
   font-weight: 750;
   letter-spacing: -0.08em;
-  background: rgba(115, 133, 101, 0.12);
+  background: #fffefa;
 }
 
 .chat-welcome h1 {
+  color: var(--text) !important;
   font-size: clamp(1.35rem, 2.4vw, 1.9rem) !important;
 }
 
