@@ -807,8 +807,6 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
   font-size: var(--fs-14);
 }
 
-.metric-folder-hint { margin-top: -0.35rem; margin-bottom: 0.6rem; }
-
 .callout-card {
   padding: 1.1rem 1.25rem;
   border: 1px solid var(--border);
