@@ -1,5 +1,6 @@
 import sqlite3
 import tempfile
+import json
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -8,7 +9,11 @@ from core.assistant_core import _bounded_history, build_tools, run_assistant
 from core.filetools import approve_proposal, make_proposal, read_file
 from core.i18n import normalize_language, text_direction, translate
 from core.network import fetch_webpage
-from core.personalization import compose_system_prompt, retrieve_personal_context
+from core.personalization import (
+    MAX_USER_INSTRUCTIONS_CHARS,
+    compose_system_prompt,
+    retrieve_personal_context,
+)
 from core.providers import Provider, list_models, select_model_for_task
 from core.security import is_sensitive, resolve_inside, validate_provider_base_url
 from core.storage import add_note, delete_note, list_notes
@@ -200,7 +205,8 @@ class PersonalizationTests(unittest.TestCase):
         self.assertIn("تعليمات الأساس", prompt)
         self.assertIn("تفضيلات وتعليمات المستخدم الإضافية", prompt)
         self.assertIn("لا تختلق مصادر أو نتائج أدوات", prompt)
-        self.assertLessEqual(len(prompt), len("تعليمات الأساس") + 5_000)
+        # التعليمات الزائدة تُقتطع عند الحد الأقصى المعلن
+        self.assertIn(instructions.strip()[:MAX_USER_INSTRUCTIONS_CHARS], prompt)
         self.assertNotIn(instructions, prompt)
 
     def test_response_style_is_included_and_unknown_style_falls_back(self):
@@ -485,3 +491,150 @@ class ProviderRequestSafetyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class CalcToolTests(unittest.TestCase):
+    def test_basic_arithmetic_and_parentheses(self):
+        from core.calc import evaluate
+
+        self.assertEqual(evaluate("(2 + 3) * 4"), 20)
+        self.assertEqual(evaluate("10 / 4"), 2.5)
+        self.assertEqual(evaluate("2 ** 10"), 1024)
+
+    def test_rejects_unsafe_and_oversized_input(self):
+        from core.calc import evaluate
+
+        for bad in ["__import__('os')", "open('/etc/passwd')", "x = 1", "", "1 " * 300]:
+            with self.assertRaises((ValueError, TypeError)):
+                evaluate(bad)
+
+    def test_rejects_non_finite_and_huge_power(self):
+        from core.calc import evaluate
+
+        with self.assertRaises(ValueError):
+            evaluate("1 / 0")
+        with self.assertRaises(ValueError):
+            evaluate("10 ** 400")
+
+    def test_format_result(self):
+        from core.calc import evaluate, format_result
+
+        self.assertEqual(evaluate("sqrt(16)"), 4.0)
+        self.assertEqual(format_result(evaluate("1 + 1")), "2")
+
+
+class RedactTests(unittest.TestCase):
+    def test_email_and_phone_are_masked(self):
+        from core.redact import redact_text
+
+        masked = redact_text("my mail is ali@example.com and call 01012345678")
+        self.assertNotIn("ali@example.com", masked)
+        self.assertNotIn("01012345678", masked)
+
+    def test_card_numbers_pass_luhn_check(self):
+        from core.redact import redact_text
+
+        # 4242 4242 4242 4242 is a valid Luhn test card
+        masked = redact_text("card: 4242 4242 4242 4242")
+        self.assertNotIn("4242 4242 4242 4242", masked)
+        # Not a real card, should survive untouched
+        keep = redact_text("order 1234 5678 9012 3456")
+        self.assertIn("1234 5678 9012 3456", keep)
+
+    def test_redact_messages_returns_copies(self):
+        from core.redact import redact_messages
+
+        messages = [{"role": "user", "content": "reach me at ali@example.com"}]
+        redacted = redact_messages(messages)
+        self.assertNotIn("ali@example.com", redacted[0]["content"])
+        # الأصل لم يتغير
+        self.assertEqual(messages[0]["content"], "reach me at ali@example.com")
+
+
+class ImporterTests(unittest.TestCase):
+    def test_chatgpt_export_parsing(self):
+        from core.importers import parse_conversations
+
+        export = json.dumps(
+            [
+                {
+                    "title": "Deal chat",
+                    "mapping": {
+                        "n1": {
+                            "message": {
+                                "author": {"role": "user"},
+                                "create_time": 1,
+                                "content": {"parts": ["hi about the property"]},
+                            }
+                        },
+                        "n2": {
+                            "message": {
+                                "author": {"role": "assistant"},
+                                "create_time": 2,
+                                "content": {"parts": ["Sure, here is the analysis"]},
+                            }
+                        },
+                    },
+                }
+            ]
+        ).encode("utf-8")
+        conversations = parse_conversations(export)
+        self.assertEqual(len(conversations), 1)
+        roles = [m["role"] for m in conversations[0]["messages"]]
+        self.assertEqual(roles, ["user", "assistant"])
+
+    def test_claude_export_parsing(self):
+        from core.importers import parse_conversations
+
+        export = json.dumps(
+            [
+                {
+                    "name": "Follow-up",
+                    "chat_messages": [
+                        {"sender": "human", "text": "مرحبا"},
+                        {"sender": "assistant", "text": "أهلًا، أقدر أساعدك؟"},
+                    ],
+                }
+            ]
+        ).encode("utf-8")
+        conversations = parse_conversations(export)
+        self.assertEqual(len(conversations), 1)
+        self.assertEqual(
+            conversations[0]["messages"][0]["content"], "مرحبا"
+        )
+
+    def test_tolerates_garbage(self):
+        from core.importers import parse_conversations
+
+        with self.assertRaises(ValueError):
+            parse_conversations(b"not json at all")
+        self.assertEqual(parse_conversations(b"{}"), [])
+        self.assertEqual(parse_conversations(b"[{\"mapping\": 42}]"), [])
+
+
+class AppBootSmokeTests(unittest.TestCase):
+    """Boot the Streamlit app with AppTest and assert a clean first paint."""
+
+    def _boot(self):
+        from streamlit.testing.v1 import AppTest
+
+        app_path = str(Path(__file__).with_name("app.py"))
+        at = AppTest.from_file(app_path, default_timeout=90)
+        at.run()
+        return at
+
+    def test_app_boots_without_exceptions(self):
+        at = self._boot()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+
+    def test_tasks_tab_renders(self):
+        at = self._boot()
+        at.session_state["active_tab"] = "المهام"
+        at.run()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+
+    def test_settings_tab_renders(self):
+        at = self._boot()
+        at.session_state["active_tab"] = "الإعدادات"
+        at.run()
+        self.assertEqual([str(e.value) for e in at.exception], [])

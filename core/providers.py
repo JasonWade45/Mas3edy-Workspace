@@ -14,8 +14,53 @@ PRESETS = {
     "OpenRouter": "https://openrouter.ai/api/v1",
     "Custom OpenAI-compatible": "",
 }
+# نماذج موصى بها مبدئيًا لكل مزود شائع (تُعطى علامة ★ إن وُجدت في القائمة).
+PRESET_RECOMMENDED = {
+    "Groq": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+    "OpenAI": ["gpt-4o-mini", "gpt-4o"],
+    "DeepSeek": ["deepseek-chat"],
+    "OpenRouter": [],
+}
 MAX_MODELS_RESPONSE_BYTES = 2_000_000
 AUTO_MODEL_OPTION = "تلقائي حسب المهمة"
+
+
+def recommended_for_provider(provider_name: str) -> list[str]:
+    return PRESET_RECOMMENDED.get(provider_name, [])
+
+
+def context_window_for_model(model: str) -> int:
+    """Conservative context-window estimate; used for the usage meter only."""
+    name = (model or "").casefold()
+    table = (
+        ("gpt-4o", 128_000),
+        ("gpt-3.5", 16_000),
+        ("deepseek", 64_000),
+        ("llama-3.1", 128_000),
+        ("llama-3.3", 128_000),
+        ("kimi", 128_000),
+        ("qwen3", 32_000),
+        ("allam", 8_000),
+    )
+    for hint, window in table:
+        if hint in name:
+            return window
+    return 16_000
+
+
+def model_badge(model: str) -> str:
+    """Heuristic quality tiers shown next to model IDs (purely informational)."""
+    name = (model or "").casefold()
+    badges = []
+    if any(hint in name for hint in ("instant", "flash", "mini", "8b", "haiku", "small")):
+        badges.append("سريع")
+    if any(hint in name for hint in ("70b", "120b", "pro", "opus", "sonnet", "large")):
+        badges.append("قوي")
+    if name.endswith(":free") or "/free" in name:
+        badges.append("مجاني")
+    if any(hint in name for hint in ("coder", "code", "devstral")):
+        badges.append("كود")
+    return " · ".join(badges)
 
 
 def select_model_for_task(models, prompt, mode="chat", default_model=""):

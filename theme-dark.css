@@ -1,0 +1,81 @@
+/* N.O.V.A AI — Paper & Ink Dark. Injected only for explicit dark mode (or inside a prefers-color-scheme media query in auto mode). Unconditional overrides. */
+:root {
+  color-scheme: dark;
+  --bg: #141917;
+  --surface: #1c2320;
+  --surface-strong: #242c29;
+  --surface-raised: #202825;
+  --line: #2c3631;
+  --muted: #93a49a;
+  --text: #e5ebe7;
+  --green: #6fae93;
+  --green-deep: #9fd0bb;
+  --green-wash: #223029;
+  --rust: #d2a284;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+
+.stApp {
+  color: var(--text) !important;
+  background: var(--bg) !important;
+}
+
+html, body, [class*="css"], .stApp {
+  line-height: 1.6;
+}
+
+[data-testid="stSidebar"] {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+}
+
+.metric-card,
+.task-row,
+.onboarding-card,
+.hero-banner {
+  background: var(--surface-raised);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.hero-banner {
+  background:
+    radial-gradient(1200px 480px at 85% -10%, rgba(111, 174, 147, 0.22), transparent),
+    var(--surface-raised);
+}
+
+.metric-card-accent { border-top-color: var(--green); }
+.metric-label, .task-row small { color: var(--muted); }
+
+.empty-state { color: var(--muted); }
+.msg-role { background: var(--surface-strong); color: var(--muted); }
+.msg-role-user { background: var(--green-wash); color: var(--green-deep); }
+.msg-role-assistant { border-color: var(--line); color: var(--green-deep); }
+
+[data-testid="stChatMessage"] {
+  background: transparent;
+}
+
+.context-meter-bar { background: var(--surface-strong); }
+.sidebar-provider { color: var(--muted); }
+.provider-dot { background: #5b6a62; }
+.provider-dot.ok { background: #4ecb8d; box-shadow: 0 0 0 3px rgba(78, 203, 141, 0.18); }
+.provider-dot.warn { background: #e3b75a; box-shadow: 0 0 0 3px rgba(227, 183, 90, 0.18); }
+.provider-dot.error { background: #e07a68; box-shadow: 0 0 0 3px rgba(224, 122, 104, 0.2); }
+
+[data-testid="stBottom"] {
+  background: var(--bg) !important;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45);
+}
+
+[data-testid="stCaptionContainer"], .stCaption, [data-testid="stCaptionContainer"] p {
+  color: var(--muted) !important;
+  opacity: 1 !important;
+  font-size: 0.8125rem !important;
+}
+
+@media print {
+  .stApp { background: #fff !important; color: #000 !important; }
+}
