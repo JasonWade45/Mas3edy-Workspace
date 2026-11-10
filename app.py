@@ -1036,9 +1036,55 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
 
     if not st.session_state.messages:
         st.markdown(
-            f"<div class='chat-welcome'><span>N.</span><h1>{t('بماذا نبدأ؟', 'What would you like to work on?')}</h1></div>",
+            f"""
+            <div class="chat-welcome">
+              <div class="chat-welcome-mark" aria-hidden="true">N.</div>
+              <div class="chat-welcome-title">{t('بماذا نبدأ؟', 'What would you like to work on?')}</div>
+              <p class="chat-welcome-sub">{t('اسأل عن أي شيء: الكتابة، التخطيط، البرمجة، الملفات أو البحث — وسأرد حسب إعداداتك في الأعلى.', 'Ask about anything — writing, planning, code, files, or research — answered with the settings above in mind.')}</p>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
+        suggestions = [
+            (
+                t('اكتب بريدًا احترافيًا', 'Draft a professional email'),
+                t(
+                    'ساعدني في كتابة بريد احترافي. اسألني عن التفاصيل المطلوبة أولًا، ثم اكتب المسودة.',
+                    'Help me draft a professional email. Ask me for the details you need first, then write the draft.',
+                ),
+            ),
+            (
+                t('اشرح موضوعًا ببساطة', 'Explain a topic simply'),
+                t(
+                    'اشرح لي موضوعًا معقدًا بأسلوب بسيط وواضح. اسألني عن الموضوع والمستوى المطلوب أولًا.',
+                    'Explain a complex topic to me in simple, clear terms. Ask me about the topic and the required depth first.',
+                ),
+            ),
+            (
+                t('خطط ليوم منتج', 'Plan a productive day'),
+                t(
+                    'ساعدني في التخطيط ليوم منتج ومركّز. اسألني عن أولوياتي وساعات عملي أولًا.',
+                    'Help me plan a focused, productive day. Ask me about my priorities and working hours first.',
+                ),
+            ),
+            (
+                t('ولّد أفكارًا لمشروع', 'Brainstorm project ideas'),
+                t(
+                    'ساعدني في توليد أفكار. اسألني على ماذا أعمل، ثم اقترح عشر أفكار مع مزايا وعيوب كل فكرة.',
+                    'Brainstorm ideas with me. Ask me what I am working on, then suggest ten ideas with the pros and cons of each.',
+                ),
+            ),
+        ]
+        with st.container(key="chat_suggestions"):
+            suggestion_columns = st.columns(len(suggestions))
+            for suggestion_index, (label, suggestion_prompt) in enumerate(suggestions):
+                if suggestion_columns[suggestion_index].button(
+                    label,
+                    use_container_width=True,
+                    key=f"chat_suggestion_{suggestion_index}",
+                ):
+                    st.session_state.pending_prompt = suggestion_prompt
+                    st.rerun()
 
     for message_index, message in enumerate(st.session_state.messages):
         with st.chat_message(message["role"]):
@@ -1098,9 +1144,11 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
             key=f"retry_chat_{st.session_state.chat_id}",
         )
 
-    prompt = st.chat_input(
+    typed_prompt = st.chat_input(
         t("اكتب رسالتك هنا...", "Type a message..."), disabled=retry_pending
     )
+    suggested_prompt = st.session_state.pop("pending_prompt", None)
+    prompt = typed_prompt or suggested_prompt
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
