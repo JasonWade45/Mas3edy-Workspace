@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from .calc import evaluate as calc_evaluate, format_result
 from .filetools import list_files, make_proposal, read_file
 from .i18n import translate
 from .network import fetch_webpage
@@ -42,6 +43,15 @@ def build_tools(root, language="ar"):
         return translate(ar, en, language)
 
     tools = [
+        tool_schema(
+            "calculate",
+            tr(
+                "احسب تعبيرًا رياضيًا بدقة (عمليات حسابية أساسية فقط)",
+                "Evaluate a math expression precisely (basic arithmetic only)",
+            ),
+            {"expression": {"type": "string"}},
+            ["expression"],
+        ),
         tool_schema(
             "web_read",
             tr("قراءة صفحة ويب عامة عبر HTTPS", "Read a public webpage over HTTPS"),
@@ -138,6 +148,10 @@ def dispatch(name, args, root, proposals, log, language="ar"):
     def tr(ar, en):
         return translate(ar, en, language)
 
+    if name == "calculate":
+        result = format_result(calc_evaluate(args.get("expression", "")))
+        log.append("حساب: " + str(args.get("expression", "")))
+        return result
     if name == "web_read":
         result = fetch_webpage(args["url"])
         log.append("قراءة صفحة ويب")
@@ -186,6 +200,7 @@ def run_assistant(
     max_rounds=6,
     personalization_enabled=True,
     language="ar",
+    temperature: float | None = None,
 ):
     proposals, log = [], []
     if personalization_enabled:
@@ -225,8 +240,11 @@ def run_assistant(
     )
 
     for _ in range(max_rounds):
-        # نرسل الأدوات فقط إذا كانت مدعومة
-        response = chat_completion(provider, messages, tools=tools)
+        # نرسل الأدوات صراحة (None لو الموديل لا يدعمها) حتى يفهم المزود الهدف
+        tool_kwargs: dict = {"tools": tools}
+        if temperature is not None:
+            tool_kwargs["temperature"] = temperature
+        response = chat_completion(provider, messages, **tool_kwargs)
         msg = response.choices[0].message
 
         if not msg.tool_calls:
