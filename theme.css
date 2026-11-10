@@ -576,34 +576,85 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
 .chat-welcome {
   display: grid;
   justify-items: center;
-  gap: 0.65rem;
-  max-width: 580px;
-  margin: 7vh auto 0;
+  gap: 0.55rem;
+  max-width: 660px;
+  margin: clamp(1.25rem, 5vh, 3.25rem) auto 0;
+  padding: 0 0.5rem;
   color: var(--muted);
   text-align: center;
 }
 
-.chat-welcome span {
+.chat-welcome-mark {
   display: grid;
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   place-items: center;
   border: 1px solid rgba(62, 111, 99, 0.22);
-  border-radius: 15px;
+  border-radius: 16px;
   color: var(--green);
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 750;
   letter-spacing: -0.08em;
   background: #fffefa;
+  box-shadow: 0 6px 18px rgba(39, 48, 40, 0.06);
 }
 
-.chat-welcome h1 {
+.chat-welcome-title {
+  color: var(--text);
+  font-size: clamp(1.3rem, 2.3vw, 1.75rem);
+  font-weight: 720;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.chat-welcome-sub {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+
+.st-key-chat_suggestions {
+  width: min(100%, 660px);
+  margin: 1.15rem auto 0.5rem;
+}
+
+.st-key-chat_suggestions [data-testid="stHorizontalBlock"] {
+  gap: 0.6rem;
+}
+
+.st-key-chat_suggestions [data-testid="column"] {
+  min-width: 0;
+}
+
+.st-key-chat_suggestions button {
+  min-height: 58px;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line) !important;
+  border-radius: 13px !important;
+  background: #fffefa !important;
   color: var(--text) !important;
-  font-size: clamp(1.35rem, 2.4vw, 1.9rem) !important;
+  box-shadow: 0 4px 14px rgba(39, 48, 40, 0.04);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: normal;
+  text-align: center;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.st-key-chat_suggestions button:hover {
+  border-color: rgba(62, 111, 99, 0.45) !important;
+  box-shadow: 0 8px 22px rgba(39, 48, 40, 0.09);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 850px) {
   .main .block-container { padding: 1rem 0.85rem 2.5rem; }
+  .st-key-chat_suggestions [data-testid="stHorizontalBlock"] { flex-wrap: wrap; }
+  .st-key-chat_suggestions [data-testid="column"] { flex: 1 1 46% !important; min-width: 46% !important; }
   .st-key-chat_toolbar [data-testid="stHorizontalBlock"] { flex-wrap: wrap; }
   .hero-banner { min-height: auto; }
 }
