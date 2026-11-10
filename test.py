@@ -47,7 +47,7 @@ class InterfaceLanguageTests(unittest.TestCase):
 
 class SecurityAndApprovalTests(unittest.TestCase):
     def test_path_traversal_and_symlinks_are_rejected(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             root = Path(temp_dir) / "root"
             root.mkdir()
             with self.assertRaises(ValueError):
@@ -80,7 +80,7 @@ class SecurityAndApprovalTests(unittest.TestCase):
                 self.assertTrue(is_sensitive(Path(secret_path)))
 
     def test_direct_read_cannot_bypass_sensitive_path_filter(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             root = Path(temp_dir)
             git_dir = root / ".git"
             git_dir.mkdir()
@@ -108,7 +108,7 @@ class SecurityAndApprovalTests(unittest.TestCase):
                 validate_provider_base_url(url)
 
     def test_write_requires_approval_and_creates_backup(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             root = Path(temp_dir)
             path = root / "hello.txt"
             path.write_text("old", encoding="utf-8")
@@ -119,7 +119,7 @@ class SecurityAndApprovalTests(unittest.TestCase):
             self.assertIn("تم حفظ الملف", result)
 
     def test_write_proposals_reject_binary_targets_and_unsupported_extensions(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             root = Path(temp_dir)
             (root / "image.bin").write_bytes(b"\x00\x01\x02")
             with self.assertRaises(ValueError):
@@ -129,7 +129,7 @@ class SecurityAndApprovalTests(unittest.TestCase):
                 make_proposal(str(root), "write", "image.txt", content="replacement")
 
     def test_stale_proposal_is_rejected(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             root = Path(temp_dir)
             path = root / "hello.txt"
             path.write_text("old", encoding="utf-8")
@@ -139,7 +139,7 @@ class SecurityAndApprovalTests(unittest.TestCase):
                 approve_proposal(str(root), proposal)
 
     def test_write_result_is_verified_against_approved_content(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             root = Path(temp_dir)
             path = root / "hello.txt"
             path.write_text("old", encoding="utf-8")
@@ -157,8 +157,8 @@ class SecurityAndApprovalTests(unittest.TestCase):
 
     def test_proposal_is_bound_to_its_original_root(self):
         with (
-            tempfile.TemporaryDirectory() as first,
-            tempfile.TemporaryDirectory() as second,
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as first,
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as second,
         ):
             Path(first, "hello.txt").write_text("old", encoding="utf-8")
             Path(second, "hello.txt").write_text("other", encoding="utf-8")
@@ -170,7 +170,7 @@ class SecurityAndApprovalTests(unittest.TestCase):
             )
 
     def test_move_to_new_nested_directory(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             root = Path(temp_dir)
             Path(root, "source.txt").write_text("hello", encoding="utf-8")
             proposal = make_proposal(
@@ -271,7 +271,7 @@ class PersonalizationTests(unittest.TestCase):
         self.assertEqual(retrieve_personal_context("سؤال بلا مراجع"), "")
 
     def test_note_crud_is_local_validated_and_deduplicated(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             database = Path(temp_dir) / "assistant.sqlite3"
             with patch("core.storage.DB_PATH", database):
                 first_id = add_note(
@@ -289,7 +289,7 @@ class PersonalizationTests(unittest.TestCase):
 
     def test_retrieval_uses_notes_in_the_local_database(self):
         with (
-            tempfile.TemporaryDirectory() as temp_dir,
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir,
             patch("core.storage.DB_PATH", Path(temp_dir) / "assistant.sqlite3"),
         ):
             add_note("knowledge", "Python setup", "Create a virtual environment.")
@@ -298,7 +298,7 @@ class PersonalizationTests(unittest.TestCase):
             self.assertIn("virtual environment", context)
 
     def test_retrieved_context_uses_selected_language(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             database = Path(temp_dir) / "assistant.sqlite3"
             with patch("core.storage.DB_PATH", database):
                 note_id = add_note(
@@ -312,7 +312,7 @@ class PersonalizationTests(unittest.TestCase):
                 self.assertNotIn("مراجع محلية", context)
 
     def test_expired_memory_is_not_retrieved_but_remains_manageable(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             database = Path(temp_dir) / "assistant.sqlite3"
             with patch("core.storage.DB_PATH", database):
                 note_id = add_note(
@@ -321,11 +321,15 @@ class PersonalizationTests(unittest.TestCase):
                     "use concise answers",
                     expires_in_days=30,
                 )
-                with sqlite3.connect(database) as connection:
+                connection = sqlite3.connect(database)
+                try:
                     connection.execute(
                         "UPDATE assistant_notes SET expires_at='2000-01-01 00:00:00' WHERE id=?",
                         (note_id,),
                     )
+                    connection.commit()
+                finally:
+                    connection.close()
                 self.assertEqual(list_notes("memory"), [])
                 self.assertEqual(len(list_notes("memory", include_expired=True)), 1)
                 self.assertEqual(retrieve_personal_context("Any question"), "")
