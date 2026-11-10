@@ -189,9 +189,10 @@ if theme_mode == "dark":
     _dark_block = f"<style>{theme_dark_css}</style>"
 elif theme_mode == "auto" and theme_dark_css:
     _dark_block = f"<style>@media (prefers-color-scheme: dark) {{{theme_dark_css}}}</style>"
-st.markdown(
-    f"<style>{theme_css} :root {{ --nova-direction: {layout_direction}; --nova-flex-direction: {'row-reverse' if layout_direction == 'rtl' else 'row'}; --nova-shift: {'-2px' if language == 'ar' else '2px'}; --nova-heading-spacing: {'0' if language == 'ar' else '-0.025em'}; --nova-display-spacing: {'0' if language == 'ar' else '0.12em'}; }}</style>{_dark_block}",
-    unsafe_allow_html=True,
+# Inject CSS via st.html — st.markdown would run it through the markdown
+# pipeline, which can terminate the raw block early and print the CSS as text.
+st.html(
+    f"<style>{theme_css} :root {{ --nova-direction: {layout_direction}; --nova-flex-direction: {'row-reverse' if layout_direction == 'rtl' else 'row'}; --nova-shift: {'-2px' if language == 'ar' else '2px'}; --nova-heading-spacing: {'0' if language == 'ar' else '-0.025em'}; --nova-display-spacing: {'0' if language == 'ar' else '0.12em'}; }}</style>{_dark_block}"
 )
 
 
@@ -375,7 +376,7 @@ def render_pending_proposals():
         proposal_id = str(proposal.get("id", "unknown"))
         operation = proposal.get("operation", "unknown")
         with st.container(border=True):
-            st.markdown(
+            st.html(
                 f"**{t('العملية', 'Action')}:** `{operation_labels.get(operation, operation)}`"
             )
             st.markdown(
@@ -652,7 +653,6 @@ sidebar_collapsed = bool(st.session_state.sidebar_collapsed)
 if sidebar_collapsed:
     st.markdown(
         "<style>[data-testid=\"stSidebar\"][aria-expanded=\"true\"]{width:88px !important;min-width:88px !important;max-width:88px !important;}</style>",
-        unsafe_allow_html=True,
     )
 
 with st.sidebar, st.container(key="sidebar_rail" if sidebar_collapsed else "sidebar_full"):
@@ -668,14 +668,13 @@ with st.sidebar, st.container(key="sidebar_rail" if sidebar_collapsed else "side
         st.rerun()
 
     if not sidebar_collapsed:
-        st.markdown(
+        st.html(
             f"""
             <div class="sidebar-brand">
               <span class="sidebar-brand-mark">N.</span>
               <span><strong>N.O.V.A AI</strong><small>{t("مساحة عمل شخصية", "Personal workspace")}</small></span>
             </div>
             """,
-            unsafe_allow_html=True,
         )
         st.selectbox(
             t("لغة الواجهة", "Interface language"),
@@ -765,9 +764,8 @@ with st.sidebar, st.container(key="sidebar_rail" if sidebar_collapsed else "side
             "ok": t("آخر طلب نجح", "Last request succeeded"),
             "error": t("آخر طلب فشل", "Last request failed"),
         }.get(status, t("لم يُختبر بعد", "Not tested yet"))
-        st.markdown(
+        st.html(
             f'<div class="sidebar-provider"><span class="provider-dot" style="background:{status_dot}"></span>{t("المزود", "Provider")}: {active_provider}<small>{status_label}</small></div>',
-            unsafe_allow_html=True,
         )
 
         with st.expander(t("المحادثات المحفوظة", "Saved chats"), expanded=False):
@@ -805,9 +803,8 @@ with st.sidebar, st.container(key="sidebar_rail" if sidebar_collapsed else "side
                 return t("أقدم", "Older")
 
             if not saved_chats:
-                st.markdown(
+                st.html(
                     f'<div class="empty-state"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><p>{t("لا توجد محادثات مطابقة بعد.", "No matching chats yet.")}</p></div>',
-                    unsafe_allow_html=True,
                 )
             else:
                 last_group = None
@@ -902,7 +899,7 @@ render_pending_proposals()
 
 # 1. لوحة التحكم
 if tab == "لوحة التحكم":
-    st.markdown(
+    st.html(
         f"""
         <section class="hero-banner">
           <div>
@@ -913,7 +910,6 @@ if tab == "لوحة التحكم":
           <div class="hero-orbit" aria-hidden="true">N.</div>
         </section>
         """,
-        unsafe_allow_html=True,
     )
 
     # جلب البيانات الحقيقية
@@ -925,53 +921,48 @@ if tab == "لوحة التحكم":
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.markdown(
+        st.html(
             f"""
         <div class="metric-card">
             <div class="metric-label">{t("إجمالي المحادثات", "Total chats")}</div>
             <div class="metric-value">{total_chats}</div>
         </div>
         """,
-            unsafe_allow_html=True,
         )
 
     with col2:
-        st.markdown(
+        st.html(
             f"""
         <div class="metric-card">
             <div class="metric-label">{t("المزودون المحفوظون", "Saved providers")}</div>
             <div class="metric-value">{active_providers}</div>
         </div>
         """,
-            unsafe_allow_html=True,
         )
 
     with col3:
-        st.markdown(
+        st.html(
             f"""
         <div class="metric-card">
             <div class="metric-label">{t("المجلدات المصرح بها", "Approved folders")}</div>
             <div class="metric-value">{approved_folders}</div>
         </div>
         """,
-            unsafe_allow_html=True,
         )
 
     with col4:
         tasks_done_week = count_tasks_done_since(7)
-        st.markdown(
+        st.html(
             f"""
         <div class="metric-card metric-card-accent">
             <div class="metric-label">{t("مهام أُنجزت (٧ أيام)", "Tasks done (7 days)")}</div>
             <div class="metric-value">{tasks_done_week}</div>
         </div>
         """,
-            unsafe_allow_html=True,
         )
 
-    st.markdown(
+    st.html(
         f'<div class="section-kicker">{t("انطلاقة سريعة", "Quick start")}</div>',
-        unsafe_allow_html=True,
     )
     quick_chat, quick_knowledge, quick_memory = st.columns(3)
     with quick_chat:
@@ -1166,7 +1157,7 @@ if tab == "لوحة التحكم":
     )
     if not active_provider_has_key and not st.session_state.get("onboarding_dismissed"):
         with st.container(key="onboarding_card"):
-            st.markdown(
+            st.html(
                 f"""
                 <div class="onboarding-card">
                   <div class="onboarding-step-title">{t("ثلاث خطوات وتبقى جاهز", "Three steps and you are set")}</div>
@@ -1177,7 +1168,6 @@ if tab == "لوحة التحكم":
                   </ol>
                 </div>
                 """,
-                unsafe_allow_html=True,
             )
             onboard_col1, onboard_col2 = st.columns(2)
             with onboard_col1:
@@ -1199,9 +1189,8 @@ if tab == "لوحة التحكم":
                     st.session_state.onboarding_dismissed = True
                     st.rerun()
 
-    st.markdown(
+    st.html(
         "<hr style='border-color: rgba(148, 163, 184, .16); margin: 30px 0;'>",
-        unsafe_allow_html=True,
     )
 
     st.subheader(t("النشاط الأخير", "Recent activity"))
@@ -1537,7 +1526,7 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
                 use_container_width=True,
                 icon=":material/keyboard:",
             ):
-                st.markdown(
+                st.html(
                     t(
                         """**داخل المحرر**
 - `Enter` إرسال — `Shift + Enter` سطر جديد
@@ -1581,7 +1570,6 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
                   <div class="context-meter-bar"><i style="width:{meter_pct}%"></i></div>
                 </div>
                 """,
-                unsafe_allow_html=True,
             )
 
     capabilities = p_cfg.get("model_capabilities", {})
@@ -1728,7 +1716,7 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
                 st.rerun()
 
     if not st.session_state.messages:
-        st.markdown(
+        st.html(
             f"""
             <div class="chat-welcome">
               <div class="chat-welcome-mark" aria-hidden="true">N.</div>
@@ -1736,7 +1724,6 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
               <p class="chat-welcome-sub">{t('اسأل عن أي شيء: الكتابة، التخطيط، البرمجة، الملفات أو البحث — وسأرد حسب إعداداتك في الأعلى.', 'Ask about anything — writing, planning, code, files, or research — answered with the settings above in mind.')}</p>
             </div>
             """,
-            unsafe_allow_html=True,
         )
         suggestions = [
             (
@@ -1824,9 +1811,8 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
         )
         with st.chat_message(role, avatar=message_avatar):
             role_class = "user" if role == "user" else "assistant"
-            st.markdown(
+            st.html(
                 f'<div class="msg-role msg-role-{role_class}">{t("أنت", "You") if role == "user" else "N.O.V.A AI"}</div>',
-                unsafe_allow_html=True,
             )
             st.markdown(to_arabic_digits(message["content"]))
             if role == "assistant":
@@ -1970,9 +1956,8 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar=":material/person:"):
-            st.markdown(
+            st.html(
                 f'<div class="msg-role msg-role-user">{t("أنت", "You")}</div>',
-                unsafe_allow_html=True,
             )
             st.markdown(to_arabic_digits(prompt))
 
@@ -2065,9 +2050,8 @@ elif tab == "المحادثة" or tab == "بيئة البرمجة":
                 supports_tools=supports_tools_override,
             )
             with st.chat_message("assistant", avatar=":material/auto_awesome:"):
-                st.markdown(
+                st.html(
                     f'<div class="msg-role msg-role-assistant">N.O.V.A AI</div>',
-                    unsafe_allow_html=True,
                 )
                 if model_override == AUTO_MODEL_OPTION:
                     st.caption(
@@ -2394,14 +2378,13 @@ elif tab == "الذاكرة":
     st.title(t("الذاكرة والتفضيلات", "Memory & preferences"))
     if st.session_state.get("personalization_notice"):
         st.success(st.session_state.pop("personalization_notice"))
-    st.markdown(
+    st.html(
         f"""
         <div class="callout-card">
           <strong>{t("تفضيلاتك تبقى تحت سيطرتك.", "Your preferences, under your control.")}</strong><br>
           {t("أضف ملاحظات وأمثلة اختيارية؛ يسترجع النظام ما يرتبط بسؤالك فقط.", "Add optional notes and examples; only relevant items are retrieved for a question.")}
         </div>
         """,
-        unsafe_allow_html=True,
     )
     st.info(
         t(
@@ -3087,9 +3070,8 @@ elif tab == "المهام":
 
     open_tasks = list_tasks("open", limit=200)
     if not open_tasks:
-        st.markdown(
+        st.html(
             f'<div class="empty-state"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><p>{t("لا توجد مهام مفتوحة — أنجزت كل شيء؟", "No open tasks — all clear?")}</p></div>',
-            unsafe_allow_html=True,
         )
     else:
         for task in open_tasks:
@@ -3099,9 +3081,8 @@ elif tab == "المهام":
             source_badge = (
                 t("من محادثة", "from chat") if task.get("source") == "chat" else t("يدوي", "manual")
             )
-            task_col.markdown(
-                f'<div class="task-row">{task["title"]}<small>{source_badge}</small></div>',
-                unsafe_allow_html=True,
+            task_col.html(
+                f'<div class="task-row">{task["title"]}<small>{source_badge}</small></div>'
             )
             if done_col.button(
                 " ",
@@ -3131,9 +3112,8 @@ elif tab == "المهام":
                 done_col, undo_col, delete_col = st.columns(
                     [6, 1, 1], gap="small", vertical_alignment="center"
                 )
-                done_col.markdown(
-                    f'<div class="task-row task-row-done">{task["title"]}</div>',
-                    unsafe_allow_html=True,
+                done_col.html(
+                    f'<div class="task-row task-row-done">{task["title"]}</div>'
                 )
                 if undo_col.button(
                     " ",
