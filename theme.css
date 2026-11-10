@@ -182,9 +182,9 @@ header[data-testid="stHeader"] [data-testid="stToolbar"] {
 }
 
 [data-testid="stSidebar"] .stButton > button:hover {
-  color: var(--text);
-  background: var(--surface);
-  border-color: var(--border);
+  color: var(--accent-on-soft);
+  background: var(--accent-soft);
+  border-color: transparent;
 }
 
 /* Primary sidebar button (New chat): solid accent */
@@ -260,7 +260,7 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
   border: 1px solid var(--border-strong) !important;
   border-radius: var(--radius-sm);
   color: var(--text) !important;
-  background: transparent !important;
+  background: var(--surface-2) !important;
   font-weight: 620;
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease, color 140ms ease;
 }
@@ -666,7 +666,7 @@ h2 { font-size: clamp(1.35rem, 2vw, 1.85rem) !important; }
   padding: 0.6rem 0.7rem;
   border: 1px solid var(--border-strong) !important;
   border-radius: 13px !important;
-  background: transparent !important;
+  background: var(--surface-2) !important;
   color: var(--text) !important;
   box-shadow: none;
   font-size: 0.84rem;
