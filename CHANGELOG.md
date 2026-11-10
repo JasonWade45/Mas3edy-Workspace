@@ -2,6 +2,31 @@
 
 All notable changes to N.O.V.A AI. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.1] — 2026-11-10
+
+### Fixed
+- **Dark mode now covers every widget**, not just custom cards: buttons,
+  inputs, selects (and their dropdown menus), text areas, number inputs,
+  expanders, dataframes/tables, popovers and tooltips all render from design
+  tokens in both light and dark mode.
+- Sidebar nav items: transparent background, start-aligned, muted text; hover
+  = surface-2; active = accent tint with an inline-start accent bar.
+- Secondary buttons: outline style; tertiary buttons: text-only ghost style.
+- Quick start actions: single responsive grid (auto-fit, equal cells).
+- Recent activity: custom token-styled table (5 rows, relative timestamps,
+  "View all" link).
+- Approved folders metric shows an "Add an approved folder" action when 0.
+- Hero subtitle now meets WCAG AA on the hero background in both themes.
+
+### Changed
+- **Token-first theming**: `theme.css` carries all components and reads only
+  tokens; `theme-dark.css` now contains *only* token overrides (~30 lines).
+  New tokens: `--surface-2`, `--border-strong`, `--accent-soft`,
+  `--accent-on-soft`, `--accent-hover`, `--accent-contrast`, `--ring`, plus
+  semantic `--success`/`--warning`/`--danger`. All pairs verified WCAG AA
+  (4.5:1 body text, 3:1 UI boundaries) with automated contrast tests.
+- Provider status dots use token classes instead of inline colors.
+
 ## [1.1.0] — 2026-11-10
 
 ### Added

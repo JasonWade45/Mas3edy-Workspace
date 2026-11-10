@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from html import escape
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -179,7 +180,7 @@ def operation_result_text(message):
 
 
 # Local theme; direction follows the selected interface language.
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 theme_css = Path(__file__).with_name("theme.css").read_text(encoding="utf-8")
 _dark_path = Path(__file__).with_name("theme-dark.css")
 theme_dark_css = _dark_path.read_text(encoding="utf-8") if _dark_path.exists() else ""
@@ -609,6 +610,38 @@ def slash_commands(current_language):
 def _looks_rate_limited(exc):
     return "RateLimit" in type(exc).__name__ or "429" in str(exc)
 
+def relative_time(created_at: str) -> str:
+    """Best-effort relative timestamp for audit rows (SQLite stores UTC)."""
+    raw = str(created_at or "").strip()
+    stamp = None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            stamp = datetime.strptime(raw[:19], fmt).replace(tzinfo=timezone.utc)
+            break
+        except (ValueError, TypeError):
+            continue
+    if stamp is None:
+        try:
+            stamp = datetime.fromisoformat(raw)
+            if stamp.tzinfo is None:
+                stamp = stamp.replace(tzinfo=timezone.utc)
+        except ValueError:
+            return raw or "—"
+    seconds = max(0, int((datetime.now(timezone.utc) - stamp).total_seconds()))
+    if seconds < 60:
+        return t("الآن", "just now")
+    minutes = seconds // 60
+    if minutes < 60:
+        return t(f"منذ {minutes} د", f"{minutes} min ago")
+    hours = minutes // 60
+    if hours < 24:
+        return t(f"منذ {hours} س", f"{hours} h ago")
+    days = hours // 24
+    if days < 30:
+        return t(f"منذ {days} يومًا", f"{days} d ago")
+    return stamp.strftime("%Y-%m-%d")
+
+
 # --- Sidebar ---
 NAV_ICONS = {
     "لوحة التحكم": ":material/dashboard:",
@@ -759,13 +792,13 @@ with st.sidebar, st.container(key="sidebar_rail" if sidebar_collapsed else "side
         st.divider()
         active_provider = cfg.get("active_provider") or t("لم يُضف بعد", "Not set")
         status = st.session_state.get("provider_status", "unknown")
-        status_dot = {"ok": "#3e6f63", "error": "#b5541e"}.get(status, "#a8a394")
+        status_dot_class = status if status in {"ok", "error"} else "unknown"
         status_label = {
             "ok": t("آخر طلب نجح", "Last request succeeded"),
             "error": t("آخر طلب فشل", "Last request failed"),
         }.get(status, t("لم يُختبر بعد", "Not tested yet"))
         st.html(
-            f'<div class="sidebar-provider"><span class="provider-dot" style="background:{status_dot}"></span>{t("المزود", "Provider")}: {active_provider}<small>{status_label}</small></div>',
+            f'<div class="sidebar-provider"><span class="provider-dot provider-dot-{status_dot_class}"></span>{t("المزود", "Provider")}: {active_provider}<small>{status_label}</small></div>',
         )
 
         with st.expander(t("المحادثات المحفوظة", "Saved chats"), expanded=False):
@@ -949,6 +982,16 @@ if tab == "لوحة التحكم":
         </div>
         """,
         )
+        if approved_folders == 0:
+            if st.button(
+                t("أضف مجلد مصرح به", "Add an approved folder"),
+                key="metrics_add_folder",
+                icon=":material/folder_open:",
+                type="tertiary",
+                use_container_width=True,
+            ):
+                st.session_state.active_tab = "الأمان"
+                st.rerun()
 
     with col4:
         tasks_done_week = count_tasks_done_since(7)
@@ -964,101 +1007,101 @@ if tab == "لوحة التحكم":
     st.html(
         f'<div class="section-kicker">{t("انطلاقة سريعة", "Quick start")}</div>',
     )
-    quick_chat, quick_knowledge, quick_memory = st.columns(3)
-    with quick_chat:
-        if st.button(
-            t("ابدأ محادثة", "Start a chat"),
-            use_container_width=True,
-            type="primary",
-            key="quick_start_chat",
-        ):
-            st.session_state.active_tab = "المحادثة"
-            st.session_state.mode = "chat"
-            st.rerun()
-    with quick_knowledge:
-        if st.button(
-            t("أضف معلومة لقاعدة المعرفة", "Add to knowledge base"),
-            use_container_width=True,
-            key="quick_add_knowledge",
-        ):
-            st.session_state.active_tab = "قاعدة المعرفة"
-            st.rerun()
-    with quick_memory:
-        if st.button(
-            t("خصّص الذاكرة والتفضيلات", "Manage memory & preferences"),
-            use_container_width=True,
-            key="quick_personalize",
-        ):
-            st.session_state.active_tab = "الذاكرة"
-            st.rerun()
+    with st.container(key="quick_actions"):
+        quick_chat, quick_knowledge, quick_memory, briefing_col, review_col = st.columns(5)
+        with quick_chat:
+            if st.button(
+                t("ابدأ محادثة", "Start a chat"),
+                use_container_width=True,
+                type="primary",
+                key="quick_start_chat",
+            ):
+                st.session_state.active_tab = "المحادثة"
+                st.session_state.mode = "chat"
+                st.rerun()
+        with quick_knowledge:
+            if st.button(
+                t("أضف معلومة لقاعدة المعرفة", "Add to knowledge base"),
+                use_container_width=True,
+                key="quick_add_knowledge",
+            ):
+                st.session_state.active_tab = "قاعدة المعرفة"
+                st.rerun()
+        with quick_memory:
+            if st.button(
+                t("خصّص الذاكرة والتفضيلات", "Manage memory & preferences"),
+                use_container_width=True,
+                key="quick_personalize",
+            ):
+                st.session_state.active_tab = "الذاكرة"
+                st.rerun()
 
-    briefing_col, review_col = st.columns(2)
-    with briefing_col:
-        if st.button(
-            t("موجز الصباح", "Morning briefing"),
-            use_container_width=True,
-            icon=":material/wb_sunny:",
-            key="quick_morning_briefing",
-            help=t(
-                "يجمع مهامك المفتوحة ويولّد موجزًا قصيرًا بالأولويات.",
-                "Collects your open tasks and generates a short prioritized briefing.",
-            ),
-        ):
-            open_tasks = list_tasks("open", limit=10)
-            task_lines = (
-                "\n".join(f"- {task['title']}" for task in open_tasks)
-                if open_tasks
-                else t("لا توجد مهام مفتوحة مسجلة.", "No open tasks recorded.")
-            )
-            if language == "ar":
-                st.session_state.pending_prompt = (
-                    "موجز الصباح. مهامي المفتوحة الآن:\n"
-                    + task_lines
-                    + "\n\nاكتب موجزًا قصيرًا: أهم ٣ أولويات، خطر واحد أنتبه له، وأول خطوة في ١٠ دقائق. بلا أسئلة تمهيدية."
+        with briefing_col:
+            if st.button(
+                t("موجز الصباح", "Morning briefing"),
+                use_container_width=True,
+                icon=":material/wb_sunny:",
+                key="quick_morning_briefing",
+                help=t(
+                    "يجمع مهامك المفتوحة ويولّد موجزًا قصيرًا بالأولويات.",
+                    "Collects your open tasks and generates a short prioritized briefing.",
+                ),
+            ):
+                open_tasks = list_tasks("open", limit=10)
+                task_lines = (
+                    "\n".join(f"- {task['title']}" for task in open_tasks)
+                    if open_tasks
+                    else t("لا توجد مهام مفتوحة مسجلة.", "No open tasks recorded.")
                 )
-            else:
-                st.session_state.pending_prompt = (
-                    "Morning briefing. My open tasks right now:\n"
-                    + task_lines
-                    + "\n\nWrite a short briefing: top 3 priorities, one risk to watch, and the first 10-minute step. No preamble questions."
-                )
-            st.session_state.active_tab = "المحادثة"
-            st.session_state.mode = "chat"
-            st.rerun()
-    with review_col:
-        if st.button(
-            t("مراجعة الأسبوع", "Weekly review"),
-            use_container_width=True,
-            icon=":material/event_note:",
-            key="quick_weekly_review",
-            help=t(
-                "يلخّص أسبوعك: المنجز، العالق، وما يستحق إسقاطه.",
-                "Summarizes your week: done, stuck, and what to drop.",
-            ),
-        ):
-            done_tasks = list_tasks("done", limit=20)
-            open_tasks = list_tasks("open", limit=10)
-            done_lines = "\n".join(f"- {task['title']}" for task in done_tasks) or "-"
-            open_lines = "\n".join(f"- {task['title']}" for task in open_tasks) or "-"
-            if language == "ar":
-                st.session_state.pending_prompt = (
-                    "مراجعة أسبوعية. المنجز مؤخرًا:\n"
-                    + done_lines
-                    + "\n\nالمفتوح:\n"
-                    + open_lines
-                    + "\n\nاكتب: ٣ دروس للأسبوع الماضي، ما الذي عالق ولماذا، وما الذي يجب إسقاطه أو إسناده، وخطة الأسبوع القادم بحد أقصى ٥ نقاط."
-                )
-            else:
-                st.session_state.pending_prompt = (
-                    "Weekly review. Recently done:\n"
-                    + done_lines
-                    + "\n\nStill open:\n"
-                    + open_lines
-                    + "\n\nWrite: 3 lessons from last week, what is stuck and why, what to drop or delegate, and next week's plan in at most 5 points."
-                )
-            st.session_state.active_tab = "المحادثة"
-            st.session_state.mode = "chat"
-            st.rerun()
+                if language == "ar":
+                    st.session_state.pending_prompt = (
+                        "موجز الصباح. مهامي المفتوحة الآن:\n"
+                        + task_lines
+                        + "\n\nاكتب موجزًا قصيرًا: أهم ٣ أولويات، خطر واحد أنتبه له، وأول خطوة في ١٠ دقائق. بلا أسئلة تمهيدية."
+                    )
+                else:
+                    st.session_state.pending_prompt = (
+                        "Morning briefing. My open tasks right now:\n"
+                        + task_lines
+                        + "\n\nWrite a short briefing: top 3 priorities, one risk to watch, and the first 10-minute step. No preamble questions."
+                    )
+                st.session_state.active_tab = "المحادثة"
+                st.session_state.mode = "chat"
+                st.rerun()
+        with review_col:
+            if st.button(
+                t("مراجعة الأسبوع", "Weekly review"),
+                use_container_width=True,
+                icon=":material/event_note:",
+                key="quick_weekly_review",
+                help=t(
+                    "يلخّص أسبوعك: المنجز، العالق، وما يستحق إسقاطه.",
+                    "Summarizes your week: done, stuck, and what to drop.",
+                ),
+            ):
+                done_tasks = list_tasks("done", limit=20)
+                open_tasks = list_tasks("open", limit=10)
+                done_lines = "\n".join(f"- {task['title']}" for task in done_tasks) or "-"
+                open_lines = "\n".join(f"- {task['title']}" for task in open_tasks) or "-"
+                if language == "ar":
+                    st.session_state.pending_prompt = (
+                        "مراجعة أسبوعية. المنجز مؤخرًا:\n"
+                        + done_lines
+                        + "\n\nالمفتوح:\n"
+                        + open_lines
+                        + "\n\nاكتب: ٣ دروس للأسبوع الماضي، ما الذي عالق ولماذا، وما الذي يجب إسقاطه أو إسناده، وخطة الأسبوع القادم بحد أقصى ٥ نقاط."
+                    )
+                else:
+                    st.session_state.pending_prompt = (
+                        "Weekly review. Recently done:\n"
+                        + done_lines
+                        + "\n\nStill open:\n"
+                        + open_lines
+                        + "\n\nWrite: 3 lessons from last week, what is stuck and why, what to drop or delegate, and next week's plan in at most 5 points."
+                    )
+                st.session_state.active_tab = "المحادثة"
+                st.session_state.mode = "chat"
+                st.rerun()
 
     with st.expander(
         t("خطتي اليوم (نموذج سريع)", "My plan for today (quick form)"), expanded=False
@@ -1193,20 +1236,38 @@ if tab == "لوحة التحكم":
         "<hr style='border-color: rgba(148, 163, 184, .16); margin: 30px 0;'>",
     )
 
-    st.subheader(t("النشاط الأخير", "Recent activity"))
+    recent_header, recent_link = st.columns([5, 1.6], vertical_alignment="center")
+    with recent_header:
+        st.subheader(t("النشاط الأخير", "Recent activity"))
+    with recent_link:
+        if st.button(
+            t("عرض الكل ←", "View all →"),
+            key="view_all_activity",
+            type="tertiary",
+            use_container_width=True,
+        ):
+            st.session_state.active_tab = "سجل النشاط"
+            st.rerun()
     recent_activity = list_audit(limit=5)
     if recent_activity:
-        st.dataframe(
-            [
-                {
-                    t("الوقت", "Time"): created_at,
-                    t("الحدث", "Event"): event,
-                    t("التفاصيل", "Details"): detail,
-                }
-                for event, detail, created_at in recent_activity
-            ],
-            width="stretch",
-            hide_index=True,
+        table_rows = []
+        for event, detail, created_at in recent_activity:
+            table_rows.append(
+                "<tr>"
+                f"<td class='recent-time'>{escape(relative_time(created_at))}</td>"
+                f"<td class='recent-event'>{escape(str(event))}</td>"
+                f"<td class='recent-detail'>{escape(str(detail))[:90]}</td>"
+                "</tr>"
+            )
+        st.html(
+            "<table class='recent-table'>"
+            "<thead><tr>"
+            f"<th>{t('الوقت', 'Time')}</th>"
+            f"<th>{t('الحدث', 'Event')}</th>"
+            f"<th>{t('التفاصيل', 'Details')}</th>"
+            "</tr></thead>"
+            f"<tbody>{''.join(table_rows)}</tbody>"
+            "</table>"
         )
     else:
         st.info(

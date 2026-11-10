@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 import json
+import re as re_module
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -638,3 +639,77 @@ class AppBootSmokeTests(unittest.TestCase):
         at.session_state["active_tab"] = "الإعدادات"
         at.run()
         self.assertEqual([str(e.value) for e in at.exception], [])
+
+
+class ThemeTokenContrastTests(unittest.TestCase):
+    """Parse both theme files and enforce WCAG AA on the critical pairs."""
+
+    @staticmethod
+    def _tokens(css_text: str) -> dict:
+        root = re_module.search(r":root\s*\{(.*?)\}", css_text, flags=re_module.S)
+        assert root, "missing :root block"
+        tokens = {}
+        for name, value in re_module.findall(
+            r"--([a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;", root.group(1)
+        ):
+            tokens[name] = value.lower()
+        return tokens
+
+    @staticmethod
+    def _ratio(fg: str, bg: str) -> float:
+        def lum(hexcolor: str) -> float:
+            def channel(v: int) -> float:
+                v = v / 255.0
+                return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+
+            h = hexcolor.lstrip("#")
+            r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+            return (
+                0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+            )
+
+        l1, l2 = lum(fg), lum(bg)
+        return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+
+    def _load(self):
+        light = Path(__file__).with_name("theme.css").read_text(encoding="utf-8")
+        dark = Path(__file__).with_name("theme-dark.css").read_text(encoding="utf-8")
+        return self._tokens(light), self._tokens(dark)
+
+    def test_both_themes_define_the_core_tokens(self):
+        light, dark = self._load()
+        required = {
+            "bg", "surface", "surface-2", "border", "text", "text-muted",
+            "accent", "accent-contrast",
+        }
+        merged_dark = {**light, **dark}
+        for tokens in (light, merged_dark):
+            missing = required - set(tokens)
+            self.assertEqual(missing, set())
+
+    def test_body_and_muted_text_meet_aa(self):
+        light, dark = self._load()
+        for name, tokens in (("light", light), ("dark", {**light, **dark})):
+            with self.subTest(theme=name):
+                for bg in ("bg", "surface", "surface-2"):
+                    self.assertGreaterEqual(
+                        self._ratio(tokens["text"], tokens[bg]), 4.5,
+                        f"text on {bg}",
+                    )
+                    self.assertGreaterEqual(
+                        self._ratio(tokens["text-muted"], tokens[bg]), 4.5,
+                        f"text-muted on {bg}",
+                    )
+                self.assertGreaterEqual(
+                    self._ratio(tokens["accent-contrast"], tokens["accent"]), 4.5,
+                )
+
+    def test_accent_as_text_meets_aa(self):
+        light, dark = self._load()
+        for name, tokens in (("light", light), ("dark", {**light, **dark})):
+            with self.subTest(theme=name):
+                for bg in ("bg", "surface", "surface-2"):
+                    self.assertGreaterEqual(
+                        self._ratio(tokens["accent"], tokens[bg]), 4.5,
+                        f"accent on {bg}",
+                    )
